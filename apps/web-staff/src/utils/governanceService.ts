@@ -75,7 +75,7 @@ export const purgeUserClientSide = async (targetUid: string): Promise<{ success:
 
     return {
       success: true,
-      message: "Cascading hard purge completed successfully via Client SDK."
+      message: "Deleted successfully"
     };
 
   } catch (error: any) {

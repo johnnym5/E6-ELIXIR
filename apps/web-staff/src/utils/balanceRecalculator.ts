@@ -1,7 +1,6 @@
 import { doc, collection, getDocs, query, where, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
-
-const LIVE_FX_RATE = 1945.50;
+import { LIVE_FX_RATE } from '../constants';
 
 /**
  * Client-Side Ledger Recalculation Engine

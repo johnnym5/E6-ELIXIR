@@ -109,7 +109,7 @@ export const StudentTableFilters: React.FC<StudentTableFiltersProps> = ({
          Unified High-Density Search & Filter Bar
          "Everything is inside the bar"
       */}
-      <div className="relative flex items-center p-1.5 glass-card border focus-within:border-amber-500/50 transition-all duration-500">
+      <div className="relative flex items-center p-1.5 glass-card border border-slate-200 dark:border-zinc-800 focus-within:border-amber-500/50 transition-all duration-500">
 
         {/* Left: Search Identity */}
         <div className="flex-1 flex items-center min-w-[180px]">
@@ -133,7 +133,7 @@ export const StudentTableFilters: React.FC<StudentTableFiltersProps> = ({
         </div>
 
         {/* Vertical Divider */}
-        <div className={`h-8 w-px mx-1 hidden sm:block ${isDark ? 'bg-white/10' : 'bg-slate-100'}`} />
+        <div className={`h-8 w-px mx-1 hidden sm:block ${isDark ? 'dark:bg-zinc-800' : 'bg-slate-100'}`} />
 
         {/* Integrated Filter Controls (Inside the bar) */}
         <div className="flex items-center gap-1.5 pr-1">

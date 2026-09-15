@@ -244,15 +244,15 @@ export const AdminSupportDesk: React.FC<{ initialStudentId?: string | null }> = 
   const getBubbleStyle = (msg: any) => {
     if (msg.senderRole === 'ADMIN') return 'bg-purple-600 text-white font-bold rounded-br-none shadow-xl shadow-purple-500/10';
     if (msg.senderRole === 'COUNSELOR') return 'bg-amber-500 text-slate-950 font-bold rounded-bl-none shadow-xl shadow-amber-500/10';
-    return 'bg-slate-900 border border-white/5 text-slate-300 rounded-bl-none';
+    return 'bg-zinc-900/90 border-zinc-800 shadow-none text-slate-300 rounded-bl-none';
   };
 
   return (
     <div className={`h-full w-full flex overflow-hidden transition-colors duration-500`}>
 
       {/* Sidebar: Student Queue */}
-      <aside className={`w-80 border-r flex flex-col transition-colors duration-500 bg-app border-slate-200 dark:border-white/5`}>
-        <div className="p-6 border-b space-y-4 border-slate-200 dark:border-white/5">
+      <aside className={`w-80 border-r flex flex-col transition-colors duration-500 bg-app border-slate-200 dark:border-zinc-800`}>
+        <div className="p-6 border-b space-y-4 border-slate-200 dark:border-zinc-800">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-extrabold uppercase tracking-widest text-slate-900 dark:text-white">Support Desk</h3>
             <button
@@ -269,7 +269,7 @@ export const AdminSupportDesk: React.FC<{ initialStudentId?: string | null }> = 
           </div>
 
           {!isSearchingAll ? (
-            <div className={`flex p-1 rounded-xl border ${theme === 'dark' ? 'bg-slate-900/50 border-white/5' : 'bg-white border-slate-200 shadow-sm'}`}>
+            <div className={`flex p-1 rounded-xl border ${theme === 'dark' ? 'bg-zinc-900/90 border-zinc-800 shadow-none' : 'bg-white border-slate-200 shadow-sm'}`}>
               {['All', 'Students', 'Counselors'].map((r) => (
                 <button
                   key={r}
@@ -300,7 +300,7 @@ export const AdminSupportDesk: React.FC<{ initialStudentId?: string | null }> = 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className={`w-full border rounded-xl pl-9 pr-4 py-2 text-[10px] focus:outline-none transition-all ${
-                theme === 'dark' ? 'bg-slate-900/50 border-white/10 text-white' : 'bg-white border-slate-200 text-slate-900 shadow-sm'
+                theme === 'dark' ? 'bg-zinc-900/90 border-zinc-800 shadow-none text-white' : 'bg-white border-slate-200 text-slate-900 shadow-sm'
               } ${isSearchingAll ? 'ring-1 ring-amber-500/30 border-amber-500/50' : ''}`}
             />
           </div>
@@ -322,7 +322,7 @@ export const AdminSupportDesk: React.FC<{ initialStudentId?: string | null }> = 
                            <p className="text-[9px] font-medium text-rose-300 uppercase tracking-tighter">Request by: {req.userEmail || 'User'}</p>
                         </div>
                      </div>
-                     <div className="p-2 rounded-lg bg-black/20 text-[9px] text-slate-300 italic border border-white/5">
+                     <div className="p-2 rounded-lg bg-black/20 text-[9px] text-slate-300 italic border border-slate-200 dark:border-zinc-800">
                         "{req.unlinkReason || 'No reason provided'}"
                      </div>
                      <div className="flex gap-2">
@@ -356,7 +356,7 @@ export const AdminSupportDesk: React.FC<{ initialStudentId?: string | null }> = 
               className={`w-full text-left p-4 rounded-2xl border transition-all ${
                 selectedStudentId === thread.id
                   ? 'bg-amber-500/10 border-amber-500/30 ring-1 ring-amber-500/20 shadow-lg shadow-amber-500/5'
-                  : theme === 'dark' ? 'bg-slate-900/40 border-white/5 hover:bg-white/5' : 'bg-white border-slate-200 hover:bg-slate-100 shadow-sm'
+                  : theme === 'dark' ? 'bg-zinc-900/90 border-zinc-800 shadow-none hover:bg-white/5' : 'bg-white border-slate-200 hover:bg-slate-100 shadow-sm'
               }`}
             >
               <div className="flex justify-between items-start mb-1">
@@ -388,9 +388,9 @@ export const AdminSupportDesk: React.FC<{ initialStudentId?: string | null }> = 
       <main className={`flex-1 flex flex-col min-w-0 transition-colors duration-500 bg-white dark:bg-slate-950/20`}>
         {selectedStudentId ? (
           <>
-            <header className={`px-8 py-6 border-b backdrop-blur-md flex items-center justify-between transition-colors duration-500 bg-white border-slate-200 dark:bg-slate-900/20 dark:border-white/5`}>
+            <header className={`px-8 py-6 border-b backdrop-blur-md flex items-center justify-between transition-colors duration-500 bg-white border-slate-200 dark:bg-slate-900/20 dark:border-zinc-800`}>
               <div className="flex items-center space-x-4">
-                <div className={`w-11 h-11 rounded-2xl border flex items-center justify-center font-black text-amber-500 transition-colors bg-white border-slate-200 shadow-sm dark:bg-slate-800 dark:border-white/10`}>
+                <div className={`w-11 h-11 rounded-2xl border flex items-center justify-center font-black text-amber-500 transition-colors bg-white border-slate-200 shadow-sm dark:bg-slate-800 dark:border-zinc-800`}>
                   {selectedThread?.name.charAt(0)}
                 </div>
                 <div>
@@ -440,11 +440,11 @@ export const AdminSupportDesk: React.FC<{ initialStudentId?: string | null }> = 
             </div>
 
             <footer className={`p-8 border-t transition-colors duration-500 ${
-              theme === 'dark' ? 'bg-slate-900/30 border-white/5' : 'bg-slate-50 border-slate-200'
+              theme === 'dark' ? 'bg-zinc-900/90 border-zinc-800 shadow-none' : 'bg-slate-50 border-slate-200'
             }`}>
               <form onSubmit={handleReply} className="flex items-center space-x-4">
                 <div className={`flex-1 border rounded-2xl px-6 py-4 transition-all flex items-center shadow-sm ${
-                  theme === 'dark' ? 'bg-slate-950 border-white/10 focus-within:border-amber-500/50' : 'bg-white border-slate-200 focus-within:border-amber-500'
+                  theme === 'dark' ? 'bg-slate-950 border-slate-200 dark:border-zinc-800 focus-within:border-amber-500/50' : 'bg-white border-slate-200 focus-within:border-amber-500'
                 }`}>
                   <input
                     type="text"
@@ -468,7 +468,7 @@ export const AdminSupportDesk: React.FC<{ initialStudentId?: string | null }> = 
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center space-y-4 opacity-30 animate-in fade-in duration-500">
             <div className={`w-20 h-20 rounded-[2rem] border flex items-center justify-center text-slate-400 ${
-              theme === 'dark' ? 'bg-slate-900 border-white/10' : 'bg-slate-50 border-slate-200 shadow-sm'
+              theme === 'dark' ? 'bg-zinc-900/90 border-zinc-800 shadow-none' : 'bg-slate-50 border-slate-200 shadow-sm'
             }`}>
                <ShieldCheck className="w-10 h-10" />
             </div>

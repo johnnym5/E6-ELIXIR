@@ -36,10 +36,9 @@ export function resolveUserStatus(data: UserStatusData): ComplianceStatus {
   }
 
   // 1. Initial State: Newly signed up, no profile details yet
-  // If they are already approved by an admin, we treat them as awaiting setup completion
-  // but move them out of the "Incomplete Onboarding" priority bucket if needed.
   if (!data.onboardingComplete) {
-    return data.isApproved ? 'AWAITING_VERIFICATION' : 'PENDING_ONBOARDING';
+    // If already approved, move them to PENDING (Awaiting setup but authorized)
+    return data.isApproved ? 'PENDING' : 'PENDING_ONBOARDING';
   }
 
   // 2. Setup Wizard Submitted, awaiting initial data match
@@ -58,8 +57,21 @@ export function resolveUserStatus(data: UserStatusData): ComplianceStatus {
   }
 
   // 5. Mature / Validated States
-  if (data.status === 'VALIDATED' || data.status === 'CLEARED') {
-    return 'CLEARED';
+  // A student is only CLEARED if they are approved AND meet the financial target/days OR are explicitly cleared by admin
+  const isExplicitlyCleared = data.status === 'VALIDATED' || data.status === 'CLEARED';
+  const meetsCompliance = (data.targetGbp || 0) > 0 && (data.consecutiveDays || 0) >= 28;
+
+  if (isExplicitlyCleared) {
+    // Even if status is CLEARED, we check if it's a false positive (e.g. no target set)
+    // A student MUST have a target amount AND meet the 28-day maturity to be considered cleared,
+    // unless they were manually cleared by an admin (which should also set consecutiveDays to 28).
+    const hasMaturity = (data.consecutiveDays || 0) >= 28;
+
+    if (data.isApproved && (data.targetGbp || 0) > 0 && hasMaturity) {
+      return 'CLEARED';
+    }
+    // If they were cleared but don't meet requirements, they are still waiting for full compliance
+    return 'WAITING_APPROVAL';
   }
 
   // 6. Dynamic Risk States

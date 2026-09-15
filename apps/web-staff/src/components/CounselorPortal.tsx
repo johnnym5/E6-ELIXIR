@@ -149,7 +149,7 @@ export const CounselorPortal: React.FC = () => {
           };
 
           if (request.type === 'TOP_UP') {
-            updates.status = 'VALIDATED'; // Clear them if top-up approved
+            // Keep existing status, resolveUserStatus will handle visibility
           } else if (request.type === 'EXTENSION') {
             // Add days by shifting start date back
             const currentStart = new Date(evalData.startDate || Date.now());
@@ -219,7 +219,7 @@ export const CounselorPortal: React.FC = () => {
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
-                <tr className="bg-slate-950/40 text-[8px] md:text-[10px] font-black uppercase tracking-widest text-slate-500 border-b border-white/5">
+                <tr className="bg-slate-950/40 text-[8px] md:text-[10px] font-black uppercase tracking-widest text-slate-500 border-b border-slate-200 dark:border-zinc-800">
                   <th className="px-4 md:px-8 py-3 md:py-5">Student Identity</th>
                   <th className="px-4 md:px-8 py-3 md:py-5">Parameters</th>
                   <th className="hidden sm:table-cell px-8 py-5">Time Since Request</th>
@@ -227,12 +227,12 @@ export const CounselorPortal: React.FC = () => {
                   <th className="px-4 md:px-8 py-3 md:py-5 text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5 font-sans">
+              <tbody className="divide-y divide-zinc-800 font-sans">
                 {filtered.map((req) => (
                   <tr key={req.id} className="hover:bg-white/5 transition-all group">
                     <td className="px-4 md:px-8 py-4 md:py-6">
                       <div className="flex items-center space-x-3 md:space-x-4">
-                        <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-slate-800 border border-white/10 flex items-center justify-center font-black text-[10px] md:text-xs text-[#F5B651] shrink-0">
+                        <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-slate-800 border border-slate-200 dark:border-zinc-800 flex items-center justify-center font-black text-[10px] md:text-xs text-[#F5B651] shrink-0">
                           {req.name.split(' ').map(n => n[0]).join('')}
                         </div>
                         <div className="min-w-0">
@@ -244,7 +244,7 @@ export const CounselorPortal: React.FC = () => {
                     <td className="px-4 md:px-8 py-4 md:py-6">
                       <div className="flex items-center gap-2 md:gap-3">
                          <div className={`p-1.5 md:p-2 rounded-lg border shrink-0 ${
-                           req.type === 'TOP_UP' ? 'bg-blue-500/10 border-blue-500/20 text-blue-400' : 'bg-amber-500/10 border-amber-500/20 text-amber-400'
+                           req.type === 'TOP_UP' ? 'bg-blue-500/10 border-slate-200 dark:border-zinc-800 text-blue-400' : 'bg-amber-500/10 border-amber-500/20 text-amber-400'
                          }`}>
                            {req.type === 'TOP_UP' ? <Zap className="w-3 md:w-3.5 h-3 md:h-3.5" /> : <Calendar className="w-3 md:w-3.5 h-3 md:h-3.5" />}
                          </div>

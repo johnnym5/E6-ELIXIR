@@ -3,6 +3,7 @@ import { collection, query, orderBy, onSnapshot, where } from 'firebase/firestor
 import { db } from '../firebase';
 import { resolveUserStatus, ComplianceStatus } from '../services/userStatusService';
 import { FilterCriteria } from '../components/StudentTableFilters';
+import { LIVE_FX_RATE } from '../constants';
 
 export interface Student {
   id: string;
@@ -75,6 +76,12 @@ export function useStudentRoster() {
 
         let status = (d.status || 'PENDING') as any;
         if (status === 'VALIDATED') status = 'CLEARED';
+
+        // Defensive: Do not allow CLEARED status if target amount is not set
+        if (status === 'CLEARED' && (d.targetGBP || 0) <= 0) {
+          status = 'PENDING';
+        }
+
         if (days >= 22 && days < 28 && status !== 'CLEARED') status = 'NEAR_MATURITY';
         if (d.anomalyRatio > 2.5) status = 'AT_RISK';
 
@@ -134,7 +141,7 @@ export function useStudentRoster() {
 
   // Merge Data
   const liveStudents = useMemo(() => {
-    const LIVE_FX = 1945.50;
+    const LIVE_FX = LIVE_FX_RATE;
 
     const merged: Student[] = evaluations.filter(s => {
       const userProfile = allUsers.find(u => u.uid === s.userId || u.email === s.email);
@@ -150,9 +157,20 @@ export function useStudentRoster() {
       const totalGbp = accountsTotalGbp + manualTotalGbp;
       const studentRequest = requests.find(r => r.userId === s.userId || r.userEmail === s.email);
 
-      const userProfile = allUsers.find(u => u.uid === s.userId || u.email === s.email);
+      let userProfile = allUsers.find(u => u.uid === s.userId || (s.email && u.email === s.email));
+
+      // FALLBACK: If still no profile found (common for manual entries with missing emails),
+      // try to find a registered user with the EXACT same name.
+      if (!userProfile && s.name && s.name !== 'Unknown Student') {
+        userProfile = allUsers.find(u =>
+          (u.displayName?.toLowerCase() === s.name.toLowerCase() || u.username?.toLowerCase() === s.name.toLowerCase()) &&
+          u.role === 'STUDENT'
+        );
+      }
+
       const isApproved = userProfile ? (userProfile.isApproved === true && userProfile.hardDeleted !== true) : s.isApproved;
       const name = s.name === 'Unknown Student' && userProfile ? (userProfile.displayName || userProfile.username || s.name) : s.name;
+      const email = userProfile?.email || s.email;
 
       const phoneNumber = userProfile?.phoneNumber || '';
       const accountNumbers = studentAccs.map(a => a.accountNumberMasked || '').filter(Boolean);
@@ -174,12 +192,14 @@ export function useStudentRoster() {
         status: s.status,
         anomalyRatio: s.anomalyRatio,
         consecutiveDays: s.consecutiveDays || 0,
+        targetGbp: s.targetGbp,
         verificationFailed: userProfile?.verificationFailed
       });
 
       return {
         ...s,
         name,
+        email,
         isApproved,
         status: finalStatus,
         topUpStatus: userProfile?.topUpStatus,
@@ -220,7 +240,8 @@ export function useStudentRoster() {
           isApproved,
           onboardingComplete,
           verificationFailed: u.verificationFailed,
-          status: u.status
+          status: u.status,
+          targetGbp: u.onboardingProfile?.targetGbp || 0
         });
 
         merged.push({

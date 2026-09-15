@@ -24,6 +24,7 @@ import {
   setDoc
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import { LIVE_FX_RATE } from '../constants';
 
 interface ManualOverrideModalProps {
   isOpen: boolean;
@@ -50,7 +51,7 @@ export const ManualOverrideModal: React.FC<ManualOverrideModalProps> = ({
   // Live Previews
   const projectedBalanceGbp = useMemo(() => {
     if (activeMode !== 'balance') return student?.balanceGbp || 0;
-    const rate = 1945.50; // GBP/NGN rate
+    const rate = LIVE_FX_RATE; // GBP/NGN rate
     const deltaGbp = amount / rate;
     return balanceSubMode === 'deposit'
       ? (student?.balanceGbp || 0) + deltaGbp
@@ -70,7 +71,7 @@ export const ManualOverrideModal: React.FC<ManualOverrideModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      const rate = 1945.50;
+      const rate = LIVE_FX_RATE;
 
       // 1. Log Adjustment Audit Record
       await addDoc(collection(db, 'manual_adjustments'), {
@@ -209,7 +210,7 @@ export const ManualOverrideModal: React.FC<ManualOverrideModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setDaysSubMode('add')}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${daysSubMode === 'add' ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' : 'text-slate-600'}`}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${daysSubMode === 'add' ? 'bg-indigo-500/10 text-indigo-400 border-zinc-800' : 'text-slate-600'}`}
                 >
                   <Plus className="w-3 h-3" /> Add Days
                 </button>
@@ -229,7 +230,7 @@ export const ManualOverrideModal: React.FC<ManualOverrideModalProps> = ({
                   placeholder="e.g. 5"
                   value={days || ''}
                   onChange={(e) => setDays(parseInt(e.target.value) || 0)}
-                  className="w-full bg-slate-950 border border-white/10 rounded-2xl px-6 py-4 text-xl font-black text-white focus:outline-none focus:border-amber-500 transition-all"
+                  className="w-full bg-slate-950 border border-slate-200 dark:border-zinc-800 rounded-2xl px-6 py-4 text-xl font-black text-white focus:outline-none focus:border-blue-500 transition-all"
                 />
               </div>
             </div>
@@ -244,7 +245,7 @@ export const ManualOverrideModal: React.FC<ManualOverrideModalProps> = ({
               placeholder="Provide context for this manual override..."
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              className="w-full bg-slate-950 border border-white/10 rounded-2xl px-4 py-3 text-xs font-medium text-slate-300 focus:outline-none focus:border-amber-500 transition-all resize-none"
+              className="w-full bg-slate-950 border border-slate-200 dark:border-zinc-800 rounded-2xl px-4 py-3 text-xs font-medium text-slate-300 focus:outline-none focus:border-amber-500 transition-all resize-none"
             />
           </div>
 

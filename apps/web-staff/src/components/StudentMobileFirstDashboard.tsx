@@ -43,7 +43,7 @@ import {
   LogOut,
   Sparkles,
   ShieldAlert,
-  Settings2,
+  Settings,
   CheckCheck,
   History,
   Lock,
@@ -64,15 +64,16 @@ import { StudentDocumentUploadWizard } from './StudentDocumentUploadWizard';
 import { AccountMandateWizard } from './AccountMandateWizard';
 import { ElectronicLedgerStatementModal } from './ElectronicLedgerStatementModal';
 import { useUserBalance } from '../hooks/useUserBalance';
+import { useAccountProcessor, LinkedBankAccount, AccountType } from '../hooks/useAccountProcessor';
+import { useAndroidBridge } from '../hooks/useAndroidBridge';
 import { requestSmsPermissions } from '../utils/smsPermissions';
-import { SmsIngestionService } from '../services/SmsIngestionService';
 import { FuzzySmsParser } from '../services/fuzzySmsParser';
 import { SmsSyncService } from '../services/smsSyncService';
 import { toast } from 'sonner';
 import { recalculateUserBalance } from '../utils/balanceRecalculator';
 import { generateStatementClientSide } from '../utils/clientStatementGenerator';
 
-import { MAJOR_CURRENCIES } from '../constants';
+import { MAJOR_CURRENCIES, LIVE_FX_RATE } from '../constants';
 import { Link } from 'react-router-dom';
 
 // --- Types ---
@@ -109,8 +110,6 @@ interface ToastNotification {
   type?: 'INFO' | 'SUCCESS' | 'WARNING' | 'ALERT';
 }
 
-const LIVE_FX_RATE = 1945.50;
-
 const NIGERIAN_BANKS = [
   "Access Bank", "Zenith Bank", "Guaranty Trust Bank (GTB)", "United Bank for Africa (UBA)",
   "First Bank of Nigeria", "Fidelity Bank", "First City Monument Bank (FCMB)", "Stanbic IBTC Bank",
@@ -135,6 +134,15 @@ export const StudentMobileFirstDashboard: React.FC<{
 
   // --- States ---
   const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
+
+  const { accounts, totals } = useAccountProcessor({
+    liveAccounts,
+    appUser,
+    liveBalance,
+    activeUserId: currentUser?.uid,
+    selectedAccountIds
+  });
+
   const [evaluation, setEvaluation] = useState<any>(null);
   const hasInitializedSelection = useRef(false);
 
@@ -149,147 +157,6 @@ export const StudentMobileFirstDashboard: React.FC<{
       hasInitializedSelection.current = true;
     }
   }, [liveAccounts]);
-
-  // Use liveAccounts as primary data source, splitting personal balance and top-up into two separate cards
-  const accounts = useMemo(() => {
-    const list: LinkedBankAccount[] = [];
-
-    const hasDedicatedTopUp = liveAccounts.some(
-      a => a.id.startsWith('TOPUP_') || a.accountType === 'SPONSORED' || a.connectionMethod === 'TOP_UP'
-    );
-
-    const profileApprovedTopUp = Number(userProfile?.raw?.approvedCapitalNgn || userProfile?.raw?.topUpAmountNgn || 0);
-    const consolidatedNgn = Number(liveBalance.consolidatedBalanceNgn || userProfile?.raw?.consolidatedBalanceNgn || 0);
-
-    for (const item of liveAccounts) {
-      const isTopUpDoc = item.id.startsWith('TOPUP_') || item.accountType === 'SPONSORED' || item.connectionMethod === 'TOP_UP';
-      const rawBalNgn = Number(item.accountBalanceNgn ?? item.balanceNgn ?? item.balanceNGN ?? 0);
-      const topUpCapitalNgn = Number(item.orgTopUpCapitalNgn || 0);
-
-      if (!hasDedicatedTopUp && topUpCapitalNgn > 0 && !isTopUpDoc) {
-        const actualBal = Math.max(rawBalNgn - topUpCapitalNgn, 0);
-        list.push({
-          id: item.id,
-          bankName: item.bankName || 'United Bank for Africa (UBA)',
-          accountName: item.accountName || item.bankName || 'Primary Checking / Savings',
-          accountNumberMasked: item.accountNumberMasked || item.accountMask || '•••• 9543',
-          accountType: item.accountType || item.type || 'SAVINGS',
-          balanceNgn: actualBal,
-          balanceGbp: Math.round((actualBal / LIVE_FX_RATE) * 100) / 100,
-          orgTopUpCapitalNgn: 0,
-          isCapitalBreached: false,
-          isVerified: item.isVerified ?? true,
-          isDedicatedParallex: item.isDedicatedParallex || item.bankName?.includes('Parallex'),
-          lastTransactionAt: item.lastTransactionAt || (item.lastSyncedAt?.seconds ? new Date(item.lastSyncedAt.seconds * 1000).toISOString() : null),
-          isSystemTopUp: false,
-          unlinkStatus: item.unlinkStatus || 'ACTIVE',
-          connectionMethod: item.connectionMethod || item.provider || 'MANUAL_DEPOSIT',
-          lastSyncedAt: item.lastSyncedAt?.seconds
-            ? new Date(item.lastSyncedAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            : 'Just now',
-          status: item.status || 'VERIFIED'
-        });
-
-        list.push({
-          id: `TOPUP_${item.id}`,
-          bankName: 'Organization Top-Up Capital',
-          accountName: 'Basechan Sponsored Capital',
-          accountNumberMasked: '•••• TOPUP',
-          accountType: 'SPONSORED' as any,
-          balanceNgn: topUpCapitalNgn,
-          balanceGbp: Math.round((topUpCapitalNgn / LIVE_FX_RATE) * 100) / 100,
-          orgTopUpCapitalNgn: topUpCapitalNgn,
-          isCapitalBreached: false,
-          isVerified: true,
-          isDedicatedParallex: false,
-          lastTransactionAt: item.lastTransactionAt || new Date().toISOString(),
-          isSystemTopUp: false,
-          unlinkStatus: 'ACTIVE',
-          connectionMethod: 'TOP_UP' as any,
-          lastSyncedAt: 'Just now',
-          status: 'VERIFIED'
-        });
-      } else {
-        const isThisTopUp = isTopUpDoc;
-        const balGbp = item.balanceGbp || item.balanceGBP || Math.round((rawBalNgn / LIVE_FX_RATE) * 100) / 100;
-
-        list.push({
-          id: item.id,
-          bankName: isThisTopUp ? (item.bankName || 'Organization Top-Up Capital') : (item.bankName || 'Unknown Bank'),
-          accountName: item.accountName || item.bankName || (isThisTopUp ? 'Basechan Sponsored Capital' : 'Primary Account'),
-          accountNumberMasked: item.accountNumberMasked || item.accountMask || (isThisTopUp ? '•••• TOPUP' : '•••• ****'),
-          accountType: isThisTopUp ? 'SPONSORED' as any : (item.accountType || item.type || 'SAVINGS'),
-          balanceNgn: rawBalNgn,
-          balanceGbp: balGbp,
-          orgTopUpCapitalNgn: isThisTopUp ? rawBalNgn : 0,
-          isCapitalBreached: false,
-          isVerified: item.isVerified ?? true,
-          isDedicatedParallex: item.isDedicatedParallex || item.bankName?.includes('Parallex'),
-          lastTransactionAt: item.lastTransactionAt || (item.lastSyncedAt?.seconds ? new Date(item.lastSyncedAt.seconds * 1000).toISOString() : null),
-          isSystemTopUp: false,
-          unlinkStatus: item.unlinkStatus || 'ACTIVE',
-          connectionMethod: item.connectionMethod || item.provider || (isThisTopUp ? 'TOP_UP' as any : 'MANUAL_DEPOSIT'),
-          lastSyncedAt: item.lastSyncedAt?.seconds
-            ? new Date(item.lastSyncedAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            : 'Just now',
-          status: item.status || 'VERIFIED'
-        });
-      }
-    }
-
-    const currentTopUpExists = list.some(a => a.accountType === 'SPONSORED' || a.id.startsWith('TOPUP_') || a.connectionMethod === 'TOP_UP');
-    if (!currentTopUpExists) {
-      const totalPersonalNgn = list.reduce((sum, a) => sum + (Number(a.balanceNgn) || 0), 0);
-      const topUpAmount = profileApprovedTopUp > 0
-        ? profileApprovedTopUp
-        : (consolidatedNgn > totalPersonalNgn ? consolidatedNgn - totalPersonalNgn : 0);
-
-      if (topUpAmount > 0) {
-        list.push({
-          id: `TOPUP_${studentId}`,
-          bankName: 'Organization Top-Up Capital',
-          accountName: 'Basechan Sponsored Capital',
-          accountNumberMasked: '•••• TOPUP',
-          accountType: 'SPONSORED' as any,
-          balanceNgn: topUpAmount,
-          balanceGbp: Math.round((topUpAmount / LIVE_FX_RATE) * 100) / 100,
-          orgTopUpCapitalNgn: topUpAmount,
-          isCapitalBreached: false,
-          isVerified: true,
-          isDedicatedParallex: false,
-          lastTransactionAt: new Date().toISOString(),
-          isSystemTopUp: false,
-          unlinkStatus: 'ACTIVE',
-          connectionMethod: 'TOP_UP' as any,
-          lastSyncedAt: 'Just now',
-          status: 'VERIFIED'
-        });
-      }
-    }
-
-    return list;
-  }, [liveAccounts, userProfile, liveBalance, studentId]);
-
-  // Use liveBalance values for high-level metrics
-  const totals = useMemo(() => {
-    // 1. Calculate sum of selected accounts
-    const selectedAccounts = accounts.filter(a => selectedAccountIds.includes(a.id));
-    const accountsNgn = selectedAccounts.reduce((sum, acc) => sum + (Number(acc.balanceNgn) || 0), 0);
-
-    // 2. Logic: If user has explicitly selected accounts, use that sum.
-    // If NO accounts are selected, show £0/₦0 (User choice to hide everything).
-    // If NO accounts are LINKED yet, show the root document balance as a placeholder.
-    let ngn = 0;
-    if (selectedAccountIds.length > 0) {
-      ngn = accountsNgn;
-    } else if (accounts.length === 0) {
-      ngn = liveBalance.consolidatedBalanceNgn || 0;
-    }
-
-    const gbp = ngn > 0 ? (ngn / LIVE_FX_RATE) : (liveBalance.gbpEquivalent || 0);
-
-    return { ngn, gbp, accountsNgn, evaluationNgn: 0 };
-  }, [accounts, selectedAccountIds, liveBalance]);
 
   const targetGBP = evaluation?.targetGBP || 0;
   const localCurrencyCode = evaluation?.localCurrency || 'NGN';
@@ -380,87 +247,12 @@ export const StudentMobileFirstDashboard: React.FC<{
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Native SMS Listener Bridge
-  useEffect(() => {
-    const handleSmsSuccess = async (balance: number, mask: string, timestamp: number, isFallback = false) => {
-      if (!currentUser?.uid) return;
-
-      // --- 1. Fuzzy Multi-Bank Parsing ---
-      let transactions: any[] = [];
-      try {
-        if ((window as any).AndroidBridge?.getSmsMessages) {
-          const raw = (window as any).AndroidBridge.getSmsMessages();
-          const messages = JSON.parse(raw);
-          transactions = FuzzySmsParser.parseLastTransactions(messages);
-        }
-      } catch (e) {
-        console.warn('Fuzzy parsing failed:', e);
-      }
-
-      // 2. Prepare Atomic Batch Write
-      const batch = writeBatch(db);
-
-      // a. Identify and Update Account Document
-      let targetAccountId = '';
-      const matchedAcc = liveAccounts.find(acc => SmsIngestionService.verifyMatch(mask, acc.accountNumberMasked?.slice(-4) || ''));
-
-      if (matchedAcc || pendingAccountId) {
-        targetAccountId = matchedAcc?.id || pendingAccountId || '';
-        const accRef = doc(db, 'users', currentUser.uid, 'financial_accounts', targetAccountId);
-        batch.set(accRef, {
-          accountBalanceNgn: balance, // Primary field
-          balanceNgn: balance,        // Secondary fallback
-          balanceGbp: balance / LIVE_FX_RATE,
-          lastSyncedAt: serverTimestamp(),
-          status: 'VERIFIED',
-          isVerified: true,
-          verificationBadge: isFallback ? 'SYNCED FROM LATEST BANK ALERT' : null,
-          updatedAt: serverTimestamp()
-        }, { merge: true });
-
-        // Sync Transactions if found
-        if (transactions.length > 0) {
-          await SmsSyncService.syncTransactions(currentUser.uid, targetAccountId, transactions);
-        }
-      }
-
-      // b. Update Root User Document (Aggregation & Reactive Binding)
-      const userRef = doc(db, 'users', currentUser.uid);
-      batch.set(userRef, {
-        totalEquityNgn: balance,
-        consolidatedBalanceNgn: balance,
-        gbpEquivalent: balance / LIVE_FX_RATE,
-        isSyncing: false,
-        lastSyncedAt: serverTimestamp(),
-        balanceVerificationStatus: 'VERIFIED_SMS',
-        updatedAt: serverTimestamp()
-      }, { merge: true });
-
-      await batch.commit();
-
-      // 3. Trigger a success toast with the CORRECT balance
-      triggerSlideOutToast({
-        id: `sms-${Date.now()}`,
-        title: isFallback ? 'Recent Alert Sync' : 'SMS Alert Received',
-        message: isFallback
-          ? `Synced balance ₦${balance.toLocaleString()} from recent UBA alert`
-          : `UBA Balance Synced: ₦${balance.toLocaleString()}`,
-        time: 'Just now',
-        type: 'SUCCESS'
-      });
-
-      // 4. Clear modal states
-      setIsConnectModalOpen(false);
-      setIsSavingAndSyncing(false);
-      setSyncingId(null);
-    };
-
-    (window as any).onSmsBalanceUpdate = async (balance: number, mask: string, timestamp: number) => {
+  const { isNativeAndroid, triggerSmsSync, getSmsMessages } = useAndroidBridge({
+    onSuccess: async (balance, mask, timestamp) => {
       console.log(`Native SMS Update: ₦${balance} for Acct ${mask}`);
       await handleSmsSuccess(balance, mask, timestamp, false);
-    };
-
-    (window as any).onSmsSyncFailed = async (mask: string, reason: string) => {
+    },
+    onFailure: async (mask, reason) => {
       console.log(`Native Sync Failed for ${mask} (${reason}). Executing Tiered Fallback...`);
 
       if (reason === 'PERMISSION_DENIED') {
@@ -472,10 +264,8 @@ export const StudentMobileFirstDashboard: React.FC<{
 
       // Tiered Fallback Strategy
       try {
-        if ((window as any).AndroidBridge?.getSmsMessages) {
-          const raw = (window as any).AndroidBridge.getSmsMessages();
-          const messages = JSON.parse(raw);
-
+        const messages = getSmsMessages();
+        if (messages.length > 0) {
           // Execute Tiered Inspection in JS
           const result = FuzzySmsParser.findLatestBalance(messages, mask, 'UBA');
 
@@ -506,13 +296,80 @@ export const StudentMobileFirstDashboard: React.FC<{
           }).catch(() => {});
         }
       }
-    };
+    }
+  });
 
-    return () => {
-      (window as any).onSmsBalanceUpdate = null;
-      (window as any).onSmsSyncFailed = null;
-    };
-  }, [currentUser, liveAccounts, pendingAccountId]);
+  const handleSmsSuccess = async (balance: number, mask: string, timestamp: number, isFallback = false) => {
+    if (!currentUser?.uid) return;
+
+    // --- 1. Fuzzy Multi-Bank Parsing ---
+    let transactions: any[] = [];
+    try {
+      const messages = getSmsMessages();
+      if (messages.length > 0) {
+        transactions = FuzzySmsParser.parseLastTransactions(messages);
+      }
+    } catch (e) {
+      console.warn('Fuzzy parsing failed:', e);
+    }
+
+    // 2. Prepare Atomic Batch Write
+    const batch = writeBatch(db);
+
+    // a. Identify and Update Account Document
+    let targetAccountId = '';
+    const matchedAcc = liveAccounts.find(acc => acc.accountNumberMasked?.endsWith(mask.slice(-4)));
+
+    if (matchedAcc || pendingAccountId) {
+      targetAccountId = matchedAcc?.id || pendingAccountId || '';
+      const accRef = doc(db, 'users', currentUser.uid, 'financial_accounts', targetAccountId);
+      batch.set(accRef, {
+        accountBalanceNgn: balance, // Primary field
+        balanceNgn: balance,        // Secondary fallback
+        balanceGbp: balance / LIVE_FX_RATE,
+        lastSyncedAt: serverTimestamp(),
+        status: 'VERIFIED',
+        isVerified: true,
+        verificationBadge: isFallback ? 'SYNCED FROM LATEST BANK ALERT' : null,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+
+      // Sync Transactions if found
+      if (transactions.length > 0) {
+        await SmsSyncService.syncTransactions(currentUser.uid, targetAccountId, transactions);
+      }
+    }
+
+    // b. Update Root User Document (Aggregation & Reactive Binding)
+    const userRef = doc(db, 'users', currentUser.uid);
+    batch.set(userRef, {
+      totalEquityNgn: balance,
+      consolidatedBalanceNgn: balance,
+      gbpEquivalent: balance / LIVE_FX_RATE,
+      isSyncing: false,
+      lastSyncedAt: serverTimestamp(),
+      balanceVerificationStatus: 'VERIFIED_SMS',
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+
+    await batch.commit();
+
+    // 3. Trigger a success toast with the CORRECT balance
+    triggerSlideOutToast({
+      id: `sms-${Date.now()}`,
+      title: isFallback ? 'Recent Alert Sync' : 'SMS Alert Received',
+      message: isFallback
+        ? `Synced balance ₦${balance.toLocaleString()} from recent UBA alert`
+        : `UBA Balance Synced: ₦${balance.toLocaleString()}`,
+      time: 'Just now',
+      type: 'SUCCESS'
+    });
+
+    // 4. Clear modal states
+    setIsConnectModalOpen(false);
+    setIsSavingAndSyncing(false);
+    setSyncingId(null);
+  };
 
   // 2. Fetch Notifications Stream
   useEffect(() => {
@@ -616,10 +473,11 @@ export const StudentMobileFirstDashboard: React.FC<{
         }
 
         const mask = acc.accountNumberMasked.slice(-4);
-        if ((window as any).AndroidBridge) {
-          console.log(`Triggering Native SMS Sync for mask: ${mask}, Bank: ${acc.bankName}`);
-          (window as any).AndroidBridge.triggerSmsSync(mask, acc.bankName);
-
+        const triggered = triggerSmsSync(mask, acc.bankName);
+        if (!triggered) {
+          toast.error("SMS Sync is only available in the Android App.");
+          setSyncingId(null);
+        } else {
           // Safety timeout to clear the sync state if no callback comes from native
           setTimeout(() => {
             setSyncingId(prev => {
@@ -631,9 +489,6 @@ export const StudentMobileFirstDashboard: React.FC<{
               return prev;
             });
           }, 15000);
-        } else {
-          toast.error("SMS Sync is only available in the Android App.");
-          setSyncingId(null);
         }
         return;
       }
@@ -765,9 +620,8 @@ export const StudentMobileFirstDashboard: React.FC<{
       setPendingAccountId(docRef.id);
 
       // 2. Trigger SMS Sync
-      if ((window as any).AndroidBridge) {
-        (window as any).AndroidBridge.triggerSmsSync(accountNumberInput.slice(-4), selectedBank);
-      } else {
+      const triggered = triggerSmsSync(accountNumberInput.slice(-4), selectedBank);
+      if (!triggered) {
         setTimeout(async () => {
           await updateDoc(doc(db, 'financial_accounts', docRef.id), {
             status: 'VERIFIED',
@@ -784,10 +638,14 @@ export const StudentMobileFirstDashboard: React.FC<{
   };
 
   const handleRetrySync = () => {
-    if (!accountNumberInput || !(window as any).AndroidBridge) return;
+    if (!accountNumberInput) return;
     setIsSavingAndSyncing(true);
     setSyncError(null);
-    (window as any).AndroidBridge.triggerSmsSync(accountNumberInput.slice(-4), selectedBank);
+    const triggered = triggerSmsSync(accountNumberInput.slice(-4), selectedBank);
+    if (!triggered) {
+      toast.error("Bridge not available.");
+      setIsSavingAndSyncing(false);
+    }
   };
 
   const handleResendVerification = async () => {
@@ -895,7 +753,7 @@ export const StudentMobileFirstDashboard: React.FC<{
           <div className="relative overflow-hidden rounded-3xl min-h-[220px] flex items-stretch">
             {/* CARD 1: Total Liquid Converted Balance */}
             <div className={`w-full flex-shrink-0 transition-all duration-500 transform ${activeMetricCard === 0 ? 'translate-x-0 opacity-100 relative' : '-translate-x-full opacity-0 absolute'}`}>
-              <div className="h-full glass-card p-6 text-white relative flex flex-col justify-between overflow-hidden !bg-slate-900 !border-white/10 shadow-2xl">
+              <div className="h-full glass-card p-6 text-white relative flex flex-col justify-between overflow-hidden !bg-zinc-900/90 !border-zinc-800 shadow-none">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
 
                 <div>
@@ -910,7 +768,7 @@ export const StudentMobileFirstDashboard: React.FC<{
                     <p className={`text-sm sm:text-lg font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
                       {currency.symbol}{totals.ngn.toLocaleString()}
                     </p>
-                    <span className="px-1 py-0.5 rounded bg-white/10 text-[7px] font-black uppercase tracking-widest text-slate-400 border border-white/5">
+                    <span className="px-1 py-0.5 rounded dark:bg-zinc-800/50 text-[7px] font-black uppercase tracking-widest text-slate-400 border border-slate-200 dark:border-zinc-800">
                       {currency.code}
                     </span>
                   </div>
@@ -947,11 +805,20 @@ export const StudentMobileFirstDashboard: React.FC<{
                         </button>
                         <button
                           onClick={() => isStaff && onStaffAction ? onStaffAction() : setIsTopUpModalOpen(true)}
-                          aria-label={isStaff ? "Update Top-Up" : "Request Top-Up"}
-                          className="flex items-center gap-1 text-[8px] font-black uppercase tracking-widest text-blue-400 hover:text-blue-300 transition-colors border-l border-white/10 pl-3 ml-2"
+                          disabled={!isStaff && (appUser?.hasPendingTopUp || appUser?.status === 'TOPUP_PENDING')}
+                          aria-label={isStaff ? "Update Top-Up" : (appUser?.hasPendingTopUp || appUser?.status === 'TOPUP_PENDING' ? "Top-Up Request Pending" : "Request Top-Up")}
+                          className={`flex items-center gap-1 text-[8px] font-black uppercase tracking-widest transition-colors border-l border-slate-200 dark:border-zinc-800 pl-3 ml-2 ${
+                            !isStaff && (appUser?.hasPendingTopUp || appUser?.status === 'TOPUP_PENDING')
+                              ? 'text-amber-500 opacity-80 cursor-not-allowed'
+                              : 'text-blue-400 hover:text-blue-300'
+                          }`}
                         >
-                          <span>{isStaff ? 'UPDATE' : 'TOP-UP'}</span>
-                          <ArrowRight className="w-2.5 h-2.5" />
+                          <span>
+                            {isStaff
+                              ? 'UPDATE'
+                              : (appUser?.hasPendingTopUp || appUser?.status === 'TOPUP_PENDING' ? 'PENDING' : 'TOP-UP')}
+                          </span>
+                          {!(appUser?.hasPendingTopUp || appUser?.status === 'TOPUP_PENDING') && <ArrowRight className="w-2.5 h-2.5" />}
                         </button>
                       </div>
                     </div>
@@ -1019,7 +886,7 @@ export const StudentMobileFirstDashboard: React.FC<{
                   </div>
                 </div>
 
-                  <div className="pt-3 mt-3 border-t border-white/5 flex items-center justify-between">
+                  <div className="pt-3 mt-3 border-t border-slate-200 dark:border-zinc-800 flex items-center justify-between">
                   <span className="text-[9px] font-mono text-slate-400 uppercase tracking-tighter">
                     {evaluation?.startDate ? (
                       <>
@@ -1035,7 +902,7 @@ export const StudentMobileFirstDashboard: React.FC<{
                       className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-widest text-amber-500 hover:text-amber-400 transition-colors cursor-pointer"
                     >
                       <span>SETUP EVALUATION</span>
-                      <Settings2 className="w-3 h-3" />
+                      <Settings className="w-3 h-3" />
                     </button>
                   )}
                 </div>
@@ -1082,28 +949,32 @@ export const StudentMobileFirstDashboard: React.FC<{
 
           <div
             onClick={() => setIsDocumentWizardOpen(true)}
-            className="glass-card p-4 flex flex-col sm:flex-row items-center justify-between gap-4 transition-all cursor-pointer bg-white border-slate-200 shadow-md dark:bg-slate-900/80 dark:border-white/10 hover:border-blue-500/30"
+            className={`glass-card p-4 flex flex-col sm:flex-row items-center justify-between gap-4 transition-all cursor-pointer shadow-sm ${
+              isDark ? 'bg-zinc-900/80 border-zinc-800 shadow-none' : 'bg-white border-slate-200 shadow-slate-200/50'
+            }`}
           >
              <div className="flex items-center gap-3 w-full sm:w-auto">
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center border shadow-sm ${
-                  appUser?.mandateStatus === 'MANDATE_APPROVED' ? 'bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300'
+                  appUser?.mandateStatus === 'MANDATE_APPROVED'
+                    ? isDark ? 'bg-emerald-900/30 text-emerald-400 border-zinc-800' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : isDark ? 'bg-zinc-950/60 text-indigo-400 border-zinc-800' : 'bg-indigo-50 text-indigo-700 border-indigo-200'
                 }`}>
                    <Upload className="w-5 h-5" />
                 </div>
                 <div className="min-w-0">
-                   <p className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest leading-tight">
+                   <p className={`text-[10px] font-black uppercase tracking-widest leading-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
                      {appUser?.mandateStatus === 'MANDATE_APPROVED' ? 'Account Verified' :
                       appUser?.mandateStatus === 'MANDATE_SUBMITTED_AWAITING_APPROVAL' ? 'Documents Under Review' :
                       'Upgrade Account'}
                    </p>
-                   <p className="text-[9px] text-slate-500 font-bold uppercase truncate">
+                   <p className={`text-[9px] font-bold uppercase truncate ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
                      {appUser?.mandateStatus === 'MANDATE_APPROVED' ? 'All documents verified' : 'Upload ID & financial documents'}
                    </p>
                 </div>
              </div>
              <div className="flex items-center justify-between w-full sm:w-auto mt-1 sm:mt-0">
-                <span className="text-[9px] font-black text-amber-500 sm:hidden">UPGRADE NOW</span>
-                <ChevronRight className={`w-5 h-5 ${appUser?.mandateStatus === 'MANDATE_APPROVED' ? 'text-emerald-500' : 'text-amber-500'}`} />
+                <span className={`text-[9px] font-black sm:hidden ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`}>UPGRADE NOW</span>
+                <ChevronRight className={`w-5 h-5 ${appUser?.mandateStatus === 'MANDATE_APPROVED' ? 'text-emerald-500' : 'text-indigo-500'}`} />
              </div>
           </div>
         </section>
@@ -1205,7 +1076,7 @@ export const StudentMobileFirstDashboard: React.FC<{
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 py-2 border-y border-white/5 text-xs">
+                  <div className="grid grid-cols-2 gap-2 py-2 border-y border-slate-200 dark:border-zinc-800 text-xs">
                     {isTopUp ? (
                       <div className="col-span-2 mb-2 p-2.5 rounded-xl border bg-amber-500/10 border-amber-500/20">
                         <div className="flex items-center justify-between">
@@ -1250,7 +1121,7 @@ export const StudentMobileFirstDashboard: React.FC<{
                           <button
                             onClick={(e) => { e.stopPropagation(); setSelectedLedgerAccount(acc); setIsLedgerModalOpen(true); }}
                             title="Ledger"
-                            className="flex items-center justify-center w-8 h-8 rounded-lg border border-white/5 bg-slate-800 text-slate-400 hover:text-emerald-400 transition-colors"
+                            className="flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-800 text-slate-400 hover:text-emerald-400 transition-colors"
                           >
                             <ExternalLink className="w-4 h-4" />
                           </button>
@@ -1259,7 +1130,7 @@ export const StudentMobileFirstDashboard: React.FC<{
                             onClick={(e) => { e.stopPropagation(); handleSyncAccount(acc.id); }}
                             disabled={syncingId === acc.id}
                             title={isTopUp ? 'Sync Facility' : 'Sync Balance'}
-                            className="flex items-center justify-center w-8 h-8 rounded-lg border border-white/5 bg-slate-800 text-slate-400 hover:text-blue-400 transition-colors disabled:opacity-50"
+                            className="flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-800 text-slate-400 hover:text-blue-400 transition-colors disabled:opacity-50"
                           >
                             <RefreshCw className={`w-4 h-4 ${syncingId === acc.id ? 'animate-spin' : ''}`} />
                           </button>
@@ -1269,7 +1140,7 @@ export const StudentMobileFirstDashboard: React.FC<{
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleClearAccountBalance(acc.id); }}
                                 title="Clear Balance"
-                                className="flex items-center justify-center w-8 h-8 rounded-lg border border-white/5 bg-slate-800 text-slate-400 hover:text-rose-400 transition-colors"
+                                className="flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-800 text-slate-400 hover:text-rose-400 transition-colors"
                               >
                                 <XIcon className="w-4 h-4" />
                               </button>
@@ -1277,7 +1148,7 @@ export const StudentMobileFirstDashboard: React.FC<{
                               <button
                                 onClick={(e) => { e.stopPropagation(); setIsUssdModalOpen(true); }}
                                 title="USSD Codes"
-                                className="flex items-center justify-center w-8 h-8 rounded-lg border border-white/5 bg-slate-800 text-slate-400 hover:text-blue-400 transition-colors"
+                                className="flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-800 text-slate-400 hover:text-blue-400 transition-colors"
                               >
                                 <Phone className="w-4 h-4" />
                               </button>
@@ -1290,7 +1161,7 @@ export const StudentMobileFirstDashboard: React.FC<{
                             <button
                               onClick={(e) => { e.stopPropagation(); handleAdminUnlink(acc.id); }}
                               title="Revoke Top-Up"
-                              className="flex items-center justify-center w-8 h-8 rounded-lg border border-white/5 bg-slate-800 text-slate-400 hover:text-rose-500 transition-colors"
+                              className="flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-800 text-slate-400 hover:text-rose-500 transition-colors"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -1315,7 +1186,7 @@ export const StudentMobileFirstDashboard: React.FC<{
                                 : isStaff
                                   ? 'Force Unlink'
                                   : 'Request Unlink'}
-                            className={`flex items-center justify-center w-8 h-8 rounded-lg border border-white/5 bg-slate-800 transition-colors ${
+                            className={`flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-800 transition-colors ${
                               !isStaff && acc.unlinkStatus === 'UNLINK_REQUESTED'
                                 ? 'text-slate-700 cursor-not-allowed'
                                 : 'text-slate-400 hover:text-rose-400'
@@ -1364,7 +1235,7 @@ export const StudentMobileFirstDashboard: React.FC<{
       {isNotificationsOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-200" onClick={() => setIsNotificationsOpen(false)}>
           <div className="w-full max-w-md glass-card flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className={`p-4 rounded-b-none border-b flex items-center justify-between ${isDark ? 'border-white/5 bg-slate-900/60' : 'border-slate-100 bg-white'}`}>
+            <div className={`p-4 rounded-b-none border-b flex items-center justify-between ${isDark ? 'border-slate-200 dark:border-zinc-800 bg-zinc-900/90' : 'border-slate-100 bg-white'}`}>
               <div className="flex items-center space-x-2">
                 <Bell className="w-4 h-4 text-blue-600" />
                 <h3 className={`text-xs font-black uppercase tracking-wider ${isDark ? 'text-white' : 'text-slate-900'}`}>System Alerts & Logs</h3>
@@ -1373,7 +1244,7 @@ export const StudentMobileFirstDashboard: React.FC<{
                 <XIcon className="w-5 h-5" />
               </button>
             </div>
-            <div className={`max-h-80 overflow-y-auto divide-y p-2 no-scrollbar ${isDark ? 'divide-white/5' : 'divide-slate-100'}`}>
+            <div className={`max-h-80 overflow-y-auto divide-y p-2 no-scrollbar ${isDark ? 'divide-zinc-800' : 'divide-slate-100'}`}>
               {notificationsList.length === 0 ? (
                 <div className="py-8 text-center text-xs text-slate-400">
                   No active notifications
@@ -1406,7 +1277,7 @@ export const StudentMobileFirstDashboard: React.FC<{
                 ))
               )}
             </div>
-            <div className={`p-3 border-t flex justify-end items-center ${isDark ? 'border-white/5 bg-slate-950/40' : 'border-slate-100 bg-slate-50'}`}>
+            <div className={`p-3 border-t flex justify-end items-center ${isDark ? 'border-slate-200 dark:border-zinc-800 bg-zinc-900/90 shadow-none' : 'border-slate-100 bg-slate-50'}`}>
               <button
                 onClick={() => setIsNotificationsOpen(false)}
                 className="px-4 py-1.5 bg-blue-600 text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
@@ -1468,7 +1339,7 @@ export const StudentMobileFirstDashboard: React.FC<{
       {isConnectModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-200" onClick={() => handleCancelConnect()}>
           <div className="w-full max-w-md glass-card p-5 space-y-4 overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className={`flex justify-between items-center border-b pb-3 ${isDark ? 'border-white/5' : 'border-slate-100'}`}>
+            <div className={`flex justify-between items-center border-b pb-3 ${isDark ? 'dark:border-zinc-800' : 'border-slate-100'}`}>
               <div>
                 <div className="flex items-center gap-2 mb-0.5">
                   <h3 className={`text-sm font-black uppercase tracking-wider ${isDark ? 'text-white' : 'text-slate-900'}`}>Connect your Parallex account or other banks</h3>
@@ -1587,7 +1458,7 @@ export const StudentMobileFirstDashboard: React.FC<{
                         value={accountNumberInput}
                         onChange={e => setAccountNumberInput(e.target.value.replace(/\D/g, ''))}
                         className={`w-full border rounded-xl px-4 py-3 text-xs font-bold focus:outline-none transition-all ${
-                          isDark ? 'bg-slate-950 border-white/10 text-white focus:border-blue-500' : 'bg-slate-50 border-slate-200 text-slate-950 focus:border-blue-600'
+                          isDark ? 'bg-slate-950 border-slate-200 dark:border-zinc-800 text-white focus:border-blue-500' : 'bg-slate-50 border-slate-200 text-slate-950 focus:border-blue-600'
                         }`}
                       />
                     </div>

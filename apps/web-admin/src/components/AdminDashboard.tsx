@@ -184,6 +184,15 @@ export const AdminDashboard: React.FC = () => {
 
         let status = (d.status || 'PENDING') as StudentStatus;
         if (status === ('VALIDATED' as any)) status = 'CLEARED' as StudentStatus;
+
+        // Defensive: Only allow CLEARED status if target amount is set AND 28-day maturity is reached
+        if (status === 'CLEARED') {
+          const meetsCompliance = (d.targetGBP || 0) > 0 && days >= 28;
+          if (!meetsCompliance) {
+             status = 'PENDING' as StudentStatus;
+          }
+        }
+
         if (days >= 22 && days < 28 && status !== 'CLEARED') status = 'NEAR_MATURITY' as StudentStatus;
         if (d.anomalyRatio > 2.5) status = 'AT_RISK' as StudentStatus;
 

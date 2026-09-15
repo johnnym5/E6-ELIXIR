@@ -62,7 +62,7 @@ html, body, * {
   /* Dark Mode Tokens */
   --bg-app: #030712;
   --surface-glass: rgba(15, 23, 42, 0.8);
-  --surface-glass-border: rgba(255, 255, 255, 0.12);
+  --surface-glass-border: #27272a; /* zinc-800 - Clean, muted border */
   --surface-hero: rgba(15, 23, 42, 0.9);
 
   --text-main: #ffffff;
@@ -70,6 +70,21 @@ html, body, * {
   --text-subtle: #64748b;
   --accent-gold: #f59e0b;
   --accent-blue: #38bdf8;
+}
+
+@layer base {
+  .dark {
+    --border: 240 3.7% 15.9%; /* Muted dark slate/charcoal */
+    --ring: 240 3.7% 20%;
+  }
+}
+
+/* Eliminate neon/cyan focus rings and border glows in dark mode */
+.dark .glow-border,
+.dark .neon-card,
+.dark .depth-card-gold {
+  box-shadow: none !important;
+  border-color: #27272a !important; /* zinc-800 */
 }
 
 body {

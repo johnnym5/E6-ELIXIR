@@ -39,7 +39,7 @@ import {
   CheckSquare,
   Square,
   ArrowRight,
-  Settings2,
+  Settings,
   Phone,
   ShieldAlert,
   FileText,
@@ -61,9 +61,10 @@ import { ApprovedTopUpCard } from './ApprovedTopUpCard';
 import { StudentDashboardSkeleton } from './ui/LoadingStates';
 import { useStudentDashboardData } from '../hooks/useStudentDashboardData';
 import { toast } from 'sonner';
-import { MAJOR_CURRENCIES } from '../constants';
+import { MAJOR_CURRENCIES, LIVE_FX_RATE } from '../constants';
 import { recalculateUserBalance } from '../utils/balanceRecalculator';
 import { DebitProtectionService } from '../services/debitProtectionService';
+import { getCurrencySymbol } from '../utils/currencyResolver';
 
 // --- Types ---
 
@@ -95,8 +96,6 @@ interface LinkedBankAccount {
   unlinkReason?: string;
   verificationStatus?: string;
 }
-
-const LIVE_FX_RATE = 1945.50;
 
 const NIGERIAN_BANKS = [
   "Access Bank", "Zenith Bank", "Guaranty Trust Bank (GTB)", "United Bank for Africa (UBA)",
@@ -725,15 +724,15 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
               <div className="relative z-10 space-y-6">
                 <div className="flex justify-between items-start">
                   <div className="min-w-0 flex-1">
-                    <p className={`text-[10px] md:text-xs font-black uppercase tracking-[0.25em] mb-2 opacity-90 truncate ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>
+                    <p className={`text-[10px] md:text-xs font-black uppercase tracking-[0.25em] mb-2 opacity-90 truncate ${isDark ? 'text-blue-400' : 'text-blue-700'}`}>
                       {effectiveStudentName}
                     </p>
                     <h2 className={`text-4xl sm:text-5xl md:text-7xl font-black tracking-tighter leading-none break-all ${isDark ? 'text-white text-depth-header' : 'text-main'}`}>
-                      £{totals.gbp.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {getCurrencySymbol(appUser?.targetCountry)}{totals.gbp.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </h2>
                     <div className={`flex justify-between text-[8px] md:text-[10px] font-mono mt-4 border-t pt-2 uppercase tracking-tight ${isDark ? 'border-white/5 text-slate-400' : 'border-slate-200 text-muted'}`}>
-                       <span>CURRENT: £{Math.round(totals.gbp).toLocaleString()}</span>
-                       <span>TARGET: {targetGBP > 0 ? `£${targetGBP.toLocaleString()}` : '£0 (NOT SET)'}</span>
+                       <span>CURRENT: {getCurrencySymbol(appUser?.targetCountry)}{Math.round(totals.gbp).toLocaleString()}</span>
+                       <span>TARGET: {targetGBP > 0 ? `${getCurrencySymbol(appUser?.targetCountry)}${targetGBP.toLocaleString()}` : `${getCurrencySymbol(appUser?.targetCountry)}0 (NOT SET)`}</span>
                     </div>
                     <div className="mt-3 flex items-center gap-2 md:gap-3">
                        <p className={`text-lg md:text-xl font-bold uppercase tracking-tight ${isDark ? 'text-slate-400 text-depth-header' : 'text-muted'}`}>
@@ -776,15 +775,22 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
                         setIsTopUpModalOpen(true);
                       }
                     }}
-                    className={`flex items-center gap-2 text-[9px] md:text-[11px] font-black uppercase tracking-widest transition-colors cursor-pointer px-4 py-2 rounded-xl border ${
-                      isDark
-                        ? 'text-blue-400 hover:text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 border-blue-500/20'
-                        : 'text-blue-700 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border-blue-200'
+                    disabled={!isAdmin && (!!pendingTopUpRequest || appUser?.hasPendingTopUp || appUser?.status === 'TOPUP_PENDING')}
+                    className={`flex items-center gap-2 text-[9px] md:text-[11px] font-black uppercase tracking-widest transition-all cursor-pointer px-4 py-2 rounded-xl border ${
+                      !isAdmin && (pendingTopUpRequest || appUser?.hasPendingTopUp || appUser?.status === 'TOPUP_PENDING')
+                        ? (isDark ? 'bg-amber-500/10 border-amber-500/20 text-amber-400 opacity-80 cursor-not-allowed' : 'bg-amber-50 border-amber-200 text-amber-600 cursor-not-allowed')
+                        : isDark
+                          ? 'text-blue-400 hover:text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 border-blue-500/20'
+                          : 'text-blue-700 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border-blue-200'
                     }`}
                   >
-                    {isAdmin && <Settings2 className="w-3.5 h-3.5" />}
-                    <span>{isAdmin ? 'CONFIGURE CAPITAL / TOP-UP' : 'UPDATE TOP-UP'}</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
+                    {isAdmin ? <Settings className="w-3.5 h-3.5" /> : ((pendingTopUpRequest || appUser?.hasPendingTopUp || appUser?.status === 'TOPUP_PENDING') ? <Clock className="w-3.5 h-3.5" /> : null)}
+                    <span>
+                      {isAdmin
+                        ? 'CONFIGURE CAPITAL / TOP-UP'
+                        : ((pendingTopUpRequest || appUser?.hasPendingTopUp || appUser?.status === 'TOPUP_PENDING') ? 'TOP-UP REQUEST PENDING' : 'REQUEST TOP UP')}
+                    </span>
+                    {!(pendingTopUpRequest || appUser?.hasPendingTopUp || appUser?.status === 'TOPUP_PENDING') && <ArrowRight className="w-3.5 h-3.5" />}
                   </button>
                 </div>
               </div>
@@ -847,8 +853,8 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
                         />
                       </div>
                       <div className={`flex justify-between text-xs font-mono mt-3 uppercase tracking-widest ${isDark ? 'text-slate-400' : 'text-muted'}`}>
-                        <span>Current: £{Math.round(totals.gbp).toLocaleString()}</span>
-                        <span>Target: {targetGBP > 0 ? `£${targetGBP.toLocaleString()}` : '£0 (Not Set)'}</span>
+                        <span>Current: {getCurrencySymbol(appUser?.targetCountry)}{Math.round(totals.gbp).toLocaleString()}</span>
+                        <span>Target: {targetGBP > 0 ? `${getCurrencySymbol(appUser?.targetCountry)}${targetGBP.toLocaleString()}` : `${getCurrencySymbol(appUser?.targetCountry)}0 (Not Set)`}</span>
                       </div>
                     </div>
                   </div>
@@ -873,7 +879,7 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
                            : 'text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 border-amber-200'
                        }`}
                      >
-                       <Settings2 className="w-3.5 h-3.5" />
+                       <Settings className="w-3.5 h-3.5" />
                        <span>SETUP EVALUATION</span>
                      </button>
                    )}
@@ -934,16 +940,16 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
           </p>
         </div>
 
-        <div className={`p-6 md:p-8 rounded-[2rem] border backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-6 transition-all shadow-xl ${
+        <div className={`p-6 md:p-8 rounded-[2rem] border backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-6 transition-all shadow-sm ${
           isDark
-            ? 'bg-slate-900/80 border-white/10 hover:border-blue-500/30'
-            : 'bg-white/85 border-slate-200 hover:border-blue-500/40 shadow-slate-200/50'
+            ? 'bg-zinc-900/80 border-zinc-800 shadow-none'
+            : 'bg-white/85 border-slate-200 shadow-slate-200/50'
         }`}>
            <div className="flex items-start gap-4 md:gap-6 w-full sm:w-auto">
               <div className={`w-12 h-12 md:w-16 md:h-16 rounded-2xl flex items-center justify-center border shadow-sm shrink-0 ${
                 effectiveMandateStatus === 'MANDATE_APPROVED'
-                  ? isDark ? 'bg-emerald-900/30 text-emerald-400 border-emerald-800' : 'bg-emerald-50 text-emerald-600 border-emerald-200'
-                  : isDark ? 'bg-sky-950/60 text-sky-300 border-sky-800' : 'bg-sky-50 text-sky-600 border-sky-200'
+                  ? isDark ? 'bg-emerald-900/30 text-emerald-400 border-zinc-800' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  : isDark ? 'bg-zinc-950/60 text-indigo-400 border-zinc-800' : 'bg-indigo-50 text-indigo-700 border-indigo-200'
               }`}>
                  {effectiveMandateStatus === 'MANDATE_APPROVED' ? (
                    <CheckCircle2 className="w-6 h-6 md:w-8 md:h-8" />
@@ -959,7 +965,7 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
                        ? 'Package Awaiting Verification'
                        : 'Upgrade Account'}
                  </h4>
-                 <p className={`text-[10px] md:text-xs font-bold uppercase tracking-widest mt-1.5 leading-relaxed ${isDark ? 'text-slate-400' : 'text-muted'}`}>
+                 <p className={`text-[10px] md:text-xs font-bold uppercase tracking-widest mt-1.5 leading-relaxed ${isDark ? 'text-zinc-400' : 'text-muted'}`}>
                    {effectiveMandateStatus === 'MANDATE_APPROVED'
                      ? 'Regulatory account mandate has been fully verified and approved.'
                      : effectiveMandateStatus === 'MANDATE_SUBMITTED_AWAITING_APPROVAL'
@@ -980,8 +986,8 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
              }}
              className={`w-full sm:w-auto px-6 md:px-8 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer ${
                effectiveMandateStatus === 'MANDATE_APPROVED'
-                 ? 'bg-emerald-500 hover:bg-emerald-400 text-white shadow-emerald-500/20'
-                 : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-500/20 active:scale-95'
+                 ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                 : 'bg-indigo-600 hover:bg-indigo-700 text-white active:scale-95'
              }`}
            >
              {isAdmin ? (
@@ -1079,7 +1085,7 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
                           : 'bg-slate-900/70 border-amber-500/30 hover:border-amber-500/50'
                         : isSelected
                           ? 'border-blue-600/60 bg-blue-600/10 shadow-lg shadow-blue-500/10'
-                          : 'bg-slate-900/70 border-white/10'
+                          : 'bg-zinc-900/90 border-zinc-800 shadow-none'
                       : isTopUp
                         ? isSelected
                           ? 'border-amber-500 bg-amber-50/90 shadow-lg shadow-amber-500/20'
@@ -1183,7 +1189,7 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
                       </div>
                     </div>
 
-                    <div className={`grid grid-cols-2 gap-4 pb-6 border-b ${isDark ? 'border-white/5' : 'border-slate-200'}`}>
+                    <div className={`grid grid-cols-2 gap-4 pb-6 border-b border-slate-200 dark:border-zinc-800`}>
                       {isTopUp ? (
                         <div className={`col-span-2 mb-4 p-3.5 rounded-2xl border ${
                           isDark ? 'bg-amber-500/5 border-amber-500/20' : 'bg-amber-50/70 border-amber-200'
@@ -1253,7 +1259,7 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
                         <p className={`text-xl font-black ${
                           isTopUp ? 'text-amber-400' : (isDark ? 'text-blue-400' : 'text-accent-blue')
                         }`}>
-                          £{acc.balanceGbp.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          {getCurrencySymbol(appUser?.targetCountry)}{acc.balanceGbp.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </p>
                       </div>
                     </div>
@@ -1451,8 +1457,8 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
                       <select
                         value={selectedAccountType}
                         onChange={e => setSelectedAccountType(e.target.value as AccountType)}
-                        className={`w-full border rounded-2xl px-5 py-4 text-xs font-bold focus:border-blue-500 focus:outline-none transition-all ${
-                          isDark ? 'bg-slate-950 border-white/10 text-white' : 'bg-white border-slate-200 text-slate-900'
+                        className={`w-full border rounded-2xl px-5 py-4 text-xs font-bold focus:border-indigo-600 focus:outline-none transition-all ${
+                          isDark ? 'bg-slate-950 border-slate-200 dark:border-zinc-800 text-white' : 'bg-white border-slate-200 text-slate-900'
                         }`}
                       >
                         <option value="SAVINGS">SAVINGS</option>
@@ -1470,8 +1476,8 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
                         placeholder="Initial Balance (₦)"
                         value={realAmountInput}
                         onChange={e => setRealAmountInput(e.target.value)}
-                        className={`w-full border rounded-2xl px-5 py-4 text-xs font-bold focus:border-blue-500 focus:outline-none transition-all ${
-                          isDark ? 'bg-slate-950 border-white/10 text-white' : 'bg-white border-slate-200 text-slate-900'
+                        className={`w-full border rounded-2xl px-5 py-4 text-xs font-bold focus:border-indigo-600 focus:outline-none transition-all ${
+                          isDark ? 'bg-slate-950 border-slate-200 dark:border-zinc-800 text-white' : 'bg-white border-slate-200 text-slate-900'
                         }`}
                       />
                     </div>
@@ -1611,7 +1617,9 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
       <StudentProfileModal
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
-        userData={userProfile || appUser}
+        onRequestTopUp={() => setIsTopUpModalOpen(true)}
+        onUpdate={() => {}}
+        userProfile={userProfile || appUser}
         consolidatedBalance={accounts.reduce((sum, acc) => sum + acc.balanceNgn, 0)}
         holdingProgress={evaluation?.consecutiveDays ? Math.min(Math.round((evaluation.consecutiveDays / 28) * 100), 100) : 0}
       />

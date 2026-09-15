@@ -52,11 +52,11 @@ const StatusBadge: React.FC<{ status: ComplianceStatus }> = ({ status }) => {
   const styles: Record<string, string> = {
     CLEARED: theme === 'dark' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-emerald-50 text-emerald-600 border-emerald-200',
     NEEDS_TOPUP: theme === 'dark' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-amber-50 text-amber-600 border-amber-200',
-    NEAR_MATURITY: theme === 'dark' ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20' : 'bg-cyan-50 text-cyan-600 border-cyan-200',
-    AT_RISK: theme === 'dark' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 'bg-rose-50 text-rose-600 border-rose-200',
-    PENDING: theme === 'dark' ? 'bg-slate-500/10 text-slate-400 border-slate-500/20' : 'bg-slate-50 text-slate-500 border-slate-200',
-    PENDING_ONBOARDING: theme === 'dark' ? 'bg-slate-800 text-slate-500 border-white/5' : 'bg-slate-100 text-slate-400 border-slate-200',
-    AWAITING_VERIFICATION: theme === 'dark' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-blue-50 text-blue-600 border-blue-200',
+    NEAR_MATURITY: theme === 'dark' ? 'bg-indigo-500/10 text-indigo-400 border-zinc-800' : 'bg-indigo-50 text-indigo-600 border-indigo-200',
+    AT_RISK: theme === 'dark' ? 'bg-rose-500/10 text-rose-400 border-zinc-800' : 'bg-rose-50 text-rose-600 border-rose-200',
+    PENDING: theme === 'dark' ? 'bg-slate-500/10 text-slate-400 border-zinc-800' : 'bg-slate-50 text-slate-500 border-slate-200',
+    PENDING_ONBOARDING: theme === 'dark' ? 'bg-zinc-800 text-slate-500 border-zinc-700' : 'bg-slate-100 text-slate-400 border-slate-200',
+    AWAITING_VERIFICATION: theme === 'dark' ? 'bg-indigo-500/10 text-indigo-400 border-zinc-800' : 'bg-indigo-50 text-indigo-600 border-indigo-200',
     UNAUTHENTICATED: theme === 'dark' ? 'bg-rose-600/20 text-rose-500 border-rose-600/30 shadow-lg shadow-rose-900/10' : 'bg-rose-50 text-rose-700 border-rose-200 shadow-sm',
   };
 
@@ -110,9 +110,10 @@ export const StaffQueue: React.FC<StaffQueueProps> = ({ onInspect }) => {
 
         const status = resolveUserStatus({
           isApproved: d.isApproved ?? false,
-          onboardingComplete: !!(d.onboardingComplete || d.setupCompleted), // Check both for robustness
+          onboardingComplete: true, // If they are in pof_evaluations, onboarding is usually complete
           status: d.status || 'PENDING',
           consecutiveDays: days,
+          targetGbp: d.targetGBP || 0,
           verificationFailed: d.verificationFailed
         });
 
@@ -177,7 +178,7 @@ export const StaffQueue: React.FC<StaffQueueProps> = ({ onInspect }) => {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className={`w-full border rounded-2xl pl-12 pr-6 py-4 text-xs font-medium focus:outline-none focus:border-amber-500/50 transition-all backdrop-blur-md ${
-              theme === 'dark' ? 'bg-slate-900/40 border-white/10 text-white' : 'bg-white border-slate-200 text-slate-950'
+              theme === 'dark' ? 'bg-zinc-900/90 border-zinc-800 shadow-none text-white' : 'bg-white border-slate-200 text-slate-950'
             }`}
           />
         </div>
@@ -195,7 +196,7 @@ export const StaffQueue: React.FC<StaffQueueProps> = ({ onInspect }) => {
       </div>
 
       <div className={`border rounded-[2.5rem] overflow-hidden backdrop-blur-md shadow-2xl relative transition-colors duration-500 ${
-        theme === 'dark' ? 'bg-slate-900/20 border-white/5' : 'bg-white border-slate-200 shadow-sm'
+        theme === 'dark' ? 'bg-zinc-900/90 border-zinc-800 shadow-none' : 'bg-white border-slate-200 shadow-sm'
       }`}>
         {loading ? (
           <div className="p-20 flex justify-center">
@@ -206,7 +207,7 @@ export const StaffQueue: React.FC<StaffQueueProps> = ({ onInspect }) => {
             <table className="w-full text-left">
               <thead>
                 <tr className={`text-[10px] font-black uppercase tracking-widest border-b transition-colors ${
-                  theme === 'dark' ? 'bg-slate-950/40 text-slate-500 border-white/5' : 'bg-slate-100 text-slate-600 border-slate-200'
+                  theme === 'dark' ? 'bg-slate-950/40 text-slate-500 border-slate-200 dark:border-zinc-800' : 'bg-slate-100 text-slate-600 border-slate-200'
                 }`}>
                   <th className="px-8 py-6">Student Identity</th>
                   <th className="px-8 py-6">Visa Route</th>
@@ -215,7 +216,7 @@ export const StaffQueue: React.FC<StaffQueueProps> = ({ onInspect }) => {
                   <th className="px-8 py-6 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className={`divide-y transition-colors ${theme === 'dark' ? 'divide-white/5' : 'divide-slate-100'}`}>
+              <tbody className={`divide-y transition-colors ${theme === 'dark' ? 'divide-zinc-800' : 'divide-slate-100'}`}>
                 {filtered.map((student) => (
                   <tr
                     key={student.id}
@@ -228,7 +229,7 @@ export const StaffQueue: React.FC<StaffQueueProps> = ({ onInspect }) => {
                     <td className="px-8 py-7">
                       <div className="flex items-center space-x-4">
                         <div className={`w-11 h-11 rounded-2xl border flex items-center justify-center font-black text-sm transition-colors ${
-                          theme === 'dark' ? 'bg-slate-800 border-white/10 text-amber-500' : 'bg-slate-100 border-slate-200 text-amber-600'
+                          theme === 'dark' ? 'bg-slate-800 border-slate-200 dark:border-zinc-800 text-amber-500' : 'bg-slate-100 border-slate-200 text-amber-600'
                         }`}>
                           {student.name.split(' ').map(n => n[0]).join('')}
                         </div>
@@ -246,7 +247,7 @@ export const StaffQueue: React.FC<StaffQueueProps> = ({ onInspect }) => {
                                <ArrowRight className="w-2.5 h-2.5" />
                              </button>
                           </div>
-                          <p className="text-[10px] font-mono text-slate-500 mt-1 uppercase tracking-tighter">{student.id.substring(0, 8)}</p>
+                          <p className="text-[10px] font-mono text-slate-500 mt-1 uppercase tracking-tighter">{student.email || student.id.substring(0, 8)}</p>
                         </div>
                       </div>
                     </td>

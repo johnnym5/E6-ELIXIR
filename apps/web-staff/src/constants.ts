@@ -15,3 +15,5 @@ export const MAJOR_CURRENCIES = [
   { code: 'SGD', symbol: '$', name: 'Singapore Dollar' },
   { code: 'CHF', symbol: 'Fr', name: 'Swiss Franc' },
 ];
+
+export const LIVE_FX_RATE = 1945.50;

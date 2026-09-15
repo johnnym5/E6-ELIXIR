@@ -40,6 +40,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { getPlatformType } from '../utils/deviceDetection';
 import { FormConsent } from './ui/FormConsent';
+import { getCurrencyInfo } from '../utils/currencyResolver';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -265,9 +266,9 @@ export const StudentOnboardingWizard: React.FC<Props> = ({ onComplete }) => {
     setProfile(prev => {
       const next = { ...prev, [field]: value };
       if (field === 'destinationCountry' && typeof value === 'string') {
-        const mapping = DESTINATION_CURRENCY_MAP[value] || { currency: 'GBP', symbol: '£' };
-        next.targetCurrency = mapping.currency;
-        next.targetCurrencySymbol = mapping.symbol;
+        const info = getCurrencyInfo(value);
+        next.targetCurrency = info.code;
+        next.targetCurrencySymbol = info.symbol;
       }
       return next;
     });
@@ -276,24 +277,25 @@ export const StudentOnboardingWizard: React.FC<Props> = ({ onComplete }) => {
   const goNext = async () => {
     if (currentUser) {
       try {
-        await updateDoc(doc(db, 'users', currentUser.uid), {
-          onboardingProfile: {
-            homeState: profile.homeState,
-            homeCountry: profile.homeCountry,
-            phoneNumber: profile.phoneNumber,
-            destinationCountry: profile.destinationCountry,
-            targetCurrency: profile.targetCurrency,
-            targetCurrencySymbol: profile.targetCurrencySymbol,
-            isSelf: profile.isSelf,
-            sponsorRelationship: profile.sponsorRelationship,
-            bankName: profile.hasParallexAccount ? 'Parallex Bank' : profile.bankName,
-            accountNumber: profile.hasParallexAccount ? profile.parallexAccountNumber : profile.accountNumber,
-            updatedAt: serverTimestamp(),
-          },
-          onboardingComplete: false,
-        });
-      } catch {
-        // Soft fail
+        const userRef = doc(db, 'users', currentUser.uid);
+
+        // Save current step data to Firestore for persistence
+        await setDoc(userRef, {
+          currentCity: profile.homeState,
+          currentCountry: profile.homeCountry,
+          phoneNumber: profile.phoneNumber,
+          targetCountry: profile.destinationCountry,
+          targetCurrency: profile.targetCurrency,
+          targetCurrencySymbol: profile.targetCurrencySymbol,
+          isSelf: profile.isSelf,
+          sponsorRelationship: profile.sponsorRelationship,
+          bankProvider: profile.hasParallexAccount ? 'Parallex Bank' : profile.bankName,
+          accountNumber: profile.hasParallexAccount ? profile.parallexAccountNumber : profile.accountNumber,
+          fundingSource: profile.isSelf ? 'Self-Funded' : 'Sponsored',
+          updatedAt: serverTimestamp(),
+        }, { merge: true });
+      } catch (err) {
+        console.error('[Onboarding] Persistence error:', err);
       }
     }
 
@@ -438,9 +440,10 @@ export const StudentOnboardingWizard: React.FC<Props> = ({ onComplete }) => {
         await updateDoc(doc(db, 'users', currentUser.uid), {
           onboardingComplete: true,
           onboardingCompletedAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
         });
-      } catch {
-        // Ignored
+      } catch (err) {
+        console.error('[Onboarding] Finish error:', err);
       }
     }
     onComplete();
@@ -449,13 +452,25 @@ export const StudentOnboardingWizard: React.FC<Props> = ({ onComplete }) => {
   const handleSkipToDashboard = async () => {
     if (currentUser) {
       try {
-        await updateDoc(doc(db, 'users', currentUser.uid), {
+        await setDoc(doc(db, 'users', currentUser.uid), {
+          currentCity: profile.homeState,
+          currentCountry: profile.homeCountry,
+          phoneNumber: profile.phoneNumber,
+          targetCountry: profile.destinationCountry,
+          targetCurrency: profile.targetCurrency,
+          targetCurrencySymbol: profile.targetCurrencySymbol,
+          isSelf: profile.isSelf,
+          sponsorRelationship: profile.sponsorRelationship,
+          bankProvider: profile.hasParallexAccount ? 'Parallex Bank' : profile.bankName,
+          accountNumber: profile.hasParallexAccount ? profile.parallexAccountNumber : profile.accountNumber,
+          fundingSource: profile.isSelf ? 'Self-Funded' : 'Sponsored',
           balanceVerificationStatus: 'AWAITING_MOBILE_APP_SYNC',
           onboardingComplete: true,
           onboardingCompletedAt: serverTimestamp(),
-        });
+          updatedAt: serverTimestamp(),
+        }, { merge: true });
       } catch (err) {
-        console.error(err);
+        console.error('[Onboarding] Skip error:', err);
       }
     }
     onComplete();
@@ -880,8 +895,8 @@ export const StudentOnboardingWizard: React.FC<Props> = ({ onComplete }) => {
                   value={profile.sponsorRelationship}
                   onChange={e => updateProfile('sponsorRelationship', e.target.value)}
                   placeholder="e.g. Father, Mother, Sibling, Government"
-                  className={`w-full text-lg md:text-xl font-bold px-5 py-4 rounded-2xl border transition-all focus:outline-none focus:ring-4 focus:ring-blue-500/20 shadow-sm ${isDark
-                      ? 'bg-slate-900/90 border-white/10 text-white placeholder-white/30 focus:border-blue-500'
+                  className={`w-full text-lg md:text-xl font-bold px-5 py-4 rounded-2xl border transition-all focus:outline-none focus:ring-4 focus:ring-indigo-500/40 shadow-none ${isDark
+                      ? 'bg-zinc-900/90 border-zinc-800 text-white placeholder-white/30 focus:border-indigo-600'
                       : 'bg-white/95 border-slate-300 text-slate-900 placeholder-slate-400 focus:border-blue-600'
                     }`}
                 />
@@ -1087,7 +1102,7 @@ export const StudentOnboardingWizard: React.FC<Props> = ({ onComplete }) => {
                         onChange={e => updateProfile('accountNumber', e.target.value.replace(/\D/g, ''))}
                         placeholder="0123456789"
                         className={`w-full text-2xl md:text-3xl font-mono font-bold px-5 py-4 rounded-2xl border transition-all focus:outline-none focus:ring-4 focus:ring-blue-500/20 tracking-wider shadow-sm ${isDark
-                            ? 'bg-slate-900/90 border-white/10 text-white placeholder-white/30 focus:border-blue-500'
+                            ? 'bg-zinc-900/90 border-zinc-800 shadow-none text-white placeholder-white/30 focus:border-blue-500'
                             : 'bg-white/95 border-slate-300 text-slate-900 placeholder-slate-400 focus:border-blue-600'
                           }`}
                       />
@@ -1155,7 +1170,7 @@ export const StudentOnboardingWizard: React.FC<Props> = ({ onComplete }) => {
                 </>
               ) : (
                 <>
-                  <div className="w-24 h-24 rounded-3xl bg-blue-600/15 dark:bg-blue-500/25 border border-blue-500/40 flex items-center justify-center text-blue-600 dark:text-blue-400 shadow-xl shadow-blue-500/10 backdrop-blur-md">
+                  <div className="w-24 h-24 rounded-3xl bg-blue-600/15 dark:bg-blue-500/25 border-slate-200 dark:border-zinc-800 flex items-center justify-center text-blue-600 dark:text-blue-400 shadow-xl shadow-blue-500/10 backdrop-blur-md">
                     <Phone className="w-12 h-12" />
                   </div>
 
@@ -1296,7 +1311,7 @@ export const StudentOnboardingWizard: React.FC<Props> = ({ onComplete }) => {
                   <motion.div
                     initial={{ scale: 0.5, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    className="w-24 h-24 rounded-3xl bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-center text-emerald-500 shadow-xl shadow-emerald-500/20 backdrop-blur-md"
+                    className="w-24 h-24 rounded-3xl bg-emerald-500/15 border-slate-200 dark:border-zinc-800 flex items-center justify-center text-emerald-500 shadow-xl shadow-emerald-500/20 backdrop-blur-md"
                   >
                     <CheckCircle2 className="w-14 h-14" />
                   </motion.div>
@@ -1325,7 +1340,7 @@ export const StudentOnboardingWizard: React.FC<Props> = ({ onComplete }) => {
 
               {parseState === 'failed' && (
                 <>
-                  <div className="w-24 h-24 rounded-3xl bg-blue-500/15 border border-blue-500/40 flex items-center justify-center text-blue-600 dark:text-blue-400 backdrop-blur-md">
+                  <div className="w-24 h-24 rounded-3xl bg-blue-500/15 border-slate-200 dark:border-zinc-800 flex items-center justify-center text-blue-600 dark:text-blue-400 backdrop-blur-md">
                     <Shield className="w-12 h-12" />
                   </div>
 

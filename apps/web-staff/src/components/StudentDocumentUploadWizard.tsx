@@ -234,7 +234,7 @@ export const StudentDocumentUploadWizard: React.FC<Props> = ({ isOpen, onClose }
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="glass-card w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl"
+        className="glass-card w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl border border-slate-200 dark:border-zinc-800"
         onClick={e => e.stopPropagation()}
       >
         <header className="p-8 border-b border-surface-glass-border flex justify-between items-center bg-slate-950/10 dark:bg-slate-950/20">
@@ -253,7 +253,7 @@ export const StudentDocumentUploadWizard: React.FC<Props> = ({ isOpen, onClose }
                key={i}
                className={`h-1.5 flex-1 rounded-full transition-all ${
                  i + 1 === currentStage ? 'bg-blue-600 shadow-[0_0_10px_rgba(37,99,235,0.5)]' :
-                 i + 1 < currentStage ? 'bg-emerald-500/50' : 'bg-white/5'
+                 i + 1 < currentStage ? 'bg-emerald-500/50' : 'bg-zinc-800/50'
                }`}
              />
           ))}
@@ -262,7 +262,7 @@ export const StudentDocumentUploadWizard: React.FC<Props> = ({ isOpen, onClose }
         <div className="flex-1 overflow-y-auto p-8 space-y-6 no-scrollbar touch-pan-y">
           {currentStage === 1 && (
             <div className="text-center space-y-8 animate-in fade-in zoom-in-95 duration-500 py-10">
-              <div className="w-24 h-24 rounded-[2.5rem] bg-blue-600/10 border border-blue-500/20 flex items-center justify-center text-blue-500 mx-auto shadow-2xl shadow-blue-500/10">
+              <div className="w-24 h-24 rounded-[2.5rem] bg-blue-600/10 border border-slate-200 dark:border-zinc-800 flex items-center justify-center text-blue-500 mx-auto shadow-2xl shadow-blue-500/10">
                 <FileText className="w-12 h-12" />
               </div>
               <div className="max-w-md mx-auto space-y-3">
@@ -272,7 +272,7 @@ export const StudentDocumentUploadWizard: React.FC<Props> = ({ isOpen, onClose }
                 </p>
               </div>
 
-              <div className="p-6 rounded-3xl bg-blue-600/5 border border-blue-500/20 max-w-sm mx-auto flex items-start gap-4 text-left">
+              <div className="p-6 rounded-3xl bg-blue-600/5 border border-slate-200 dark:border-zinc-800 max-w-sm mx-auto flex items-start gap-4 text-left">
                 <ShieldCheck className="w-6 h-6 text-blue-500 shrink-0 mt-0.5" />
                 <p className="text-[11px] font-medium text-muted leading-relaxed uppercase tracking-tighter">
                   Ensure all information matches your official ID documents exactly to avoid compliance delays.
@@ -300,8 +300,8 @@ export const StudentDocumentUploadWizard: React.FC<Props> = ({ isOpen, onClose }
                     submission ? (
                       submission.status === 'APPROVED' ? 'bg-emerald-500/5 border-emerald-500/20' :
                       submission.status === 'REJECTED' ? 'bg-rose-500/5 border-rose-500/20' :
-                      'bg-blue-600/5 border-blue-500/20 shadow-lg shadow-blue-500/5'
-                    ) : 'bg-white/5 border-white/5'
+                      'bg-blue-600/5 border-slate-200 dark:border-zinc-800 shadow-lg shadow-blue-500/5'
+                    ) : 'bg-zinc-800/50 border-slate-200 dark:border-zinc-800'
                   }`}>
                     <div className="flex items-start justify-between mb-4">
                       <div className="min-w-0 flex-1">
@@ -325,7 +325,7 @@ export const StudentDocumentUploadWizard: React.FC<Props> = ({ isOpen, onClose }
 
                     <div className="space-y-4">
                       {submission ? (
-                         <div className="flex items-center justify-between p-4 bg-slate-950/40 border border-white/5 rounded-2xl">
+                         <div className="flex items-center justify-between p-4 bg-slate-950/40 border border-slate-200 dark:border-zinc-800 rounded-2xl">
                            <div className="flex items-center gap-3 min-w-0">
                               <div className="w-10 h-10 rounded-xl bg-blue-600/20 flex items-center justify-center text-blue-400">
                                  {req.type === 'IMAGE' ? <ImageIcon className="w-5 h-5" /> : <FileIcon className="w-5 h-5" />}
@@ -343,7 +343,7 @@ export const StudentDocumentUploadWizard: React.FC<Props> = ({ isOpen, onClose }
                            )}
                          </div>
                       ) : (
-                        <label className={`flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-3xl cursor-pointer transition-all hover:bg-white/5 ${isUploading ? 'pointer-events-none' : ''}`}>
+                        <label className={`flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-3xl cursor-pointer transition-all dark:hover:bg-zinc-800 ${isUploading ? 'pointer-events-none' : ''}`}>
                            {isUploading ? (
                              <div className="w-full space-y-4">
                                 <div className="flex justify-between items-end px-2">
@@ -375,7 +375,7 @@ export const StudentDocumentUploadWizard: React.FC<Props> = ({ isOpen, onClose }
 
           {currentStage === 4 && (
             <div className="text-center py-12 space-y-8 animate-in fade-in duration-500">
-               <div className="w-24 h-24 rounded-[2.5rem] bg-blue-600/10 border border-blue-500/20 flex items-center justify-center text-blue-500 mx-auto shadow-2xl shadow-blue-500/10">
+               <div className="w-24 h-24 rounded-[2.5rem] bg-blue-600/10 border border-slate-200 dark:border-zinc-800 flex items-center justify-center text-blue-500 mx-auto shadow-2xl shadow-blue-500/10">
                   <Layers className="w-12 h-12" />
                </div>
                <div className="space-y-3">
@@ -385,7 +385,7 @@ export const StudentDocumentUploadWizard: React.FC<Props> = ({ isOpen, onClose }
                   </p>
                </div>
 
-               <div className="bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl p-6 text-left space-y-4 max-w-md mx-auto">
+               <div className="bg-slate-100 dark:bg-zinc-900/90 border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 text-left space-y-4 max-w-md mx-auto">
                   <div className="flex items-center gap-3">
                     <ShieldCheck className="w-5 h-5 text-emerald-400" />
                     <span className="text-[10px] font-black uppercase text-main dark:text-slate-300">Unified Multi-Page Compiler Engine</span>
@@ -431,7 +431,7 @@ export const StudentDocumentUploadWizard: React.FC<Props> = ({ isOpen, onClose }
               </div>
 
               {compiledPdfUrl ? (
-                <div className="aspect-[4/5] w-full rounded-3xl overflow-hidden border border-white/10 bg-black/40 relative group">
+                <div className="aspect-[4/5] w-full rounded-3xl overflow-hidden border border-slate-200 dark:border-zinc-800 bg-black/40 relative group">
                   <iframe
                     src={`${compiledPdfUrl}#view=FitH&toolbar=0`}
                     className="w-full h-full border-none"
@@ -450,7 +450,7 @@ export const StudentDocumentUploadWizard: React.FC<Props> = ({ isOpen, onClose }
                   </div>
                 </div>
               ) : (
-                <div className="aspect-[4/5] w-full rounded-3xl border-2 border-dashed border-slate-200 dark:border-white/10 flex flex-col items-center justify-center space-y-4">
+                <div className="aspect-[4/5] w-full rounded-3xl border-2 border-dashed border-slate-200 dark:border-zinc-800 flex flex-col items-center justify-center space-y-4">
                    <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
                    <p className="text-xs font-black text-muted uppercase tracking-widest">Fetching Assembled Package...</p>
                 </div>
@@ -459,7 +459,7 @@ export const StudentDocumentUploadWizard: React.FC<Props> = ({ isOpen, onClose }
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <button
                   onClick={() => window.open(compiledPdfUrl!, '_blank')}
-                  className="py-4 bg-slate-900 border border-white/10 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-slate-800 transition-all"
+                  className="py-4 bg-zinc-900/90 border border-zinc-800 shadow-none text-white rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-slate-800 transition-all"
                 >
                   <Eye className="w-4 h-4" />
                   Review Full Page
@@ -481,7 +481,7 @@ export const StudentDocumentUploadWizard: React.FC<Props> = ({ isOpen, onClose }
            {currentStage > 1 && currentStage < 5 && (
              <button
                onClick={() => setCurrentStage(s => s - 1)}
-               className="flex-1 py-4 bg-slate-800 text-white rounded-2xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all border border-white/5"
+               className="flex-1 py-4 bg-slate-800 text-white rounded-2xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all border border-slate-200 dark:border-zinc-800"
              >
                Previous Stage
              </button>

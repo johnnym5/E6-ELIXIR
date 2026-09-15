@@ -51,7 +51,7 @@ import { IncidentEngine, SystemIncident } from '../services/incidentEngine';
 import { toast } from 'sonner';
 import { seedRequirementsClientSide } from '../utils/governanceService';
 
-import { MAJOR_CURRENCIES } from '../constants';
+import { MAJOR_CURRENCIES, LIVE_FX_RATE } from '../constants';
 
 // --- Types ---
 
@@ -169,7 +169,7 @@ export const SettingsConsole: React.FC<{ initialTab?: SettingTab }> = ({ initial
 
   // Global App Params (Rate etc)
   const [globalParams, setGlobalParams] = useState({
-    fxRate: 1945.50,
+    fxRate: LIVE_FX_RATE,
     lastUpdate: 'Just now'
   });
 
@@ -199,7 +199,7 @@ export const SettingsConsole: React.FC<{ initialTab?: SettingTab }> = ({ initial
         }
         setDefaultCurrency(data.defaultCurrency || 'NGN');
         setGlobalParams({
-          fxRate: data.fxRate || 1945.50,
+          fxRate: data.fxRate || LIVE_FX_RATE,
           lastUpdate: data.updatedAt?.seconds
             ? new Date(data.updatedAt.seconds * 1000).toLocaleTimeString()
             : 'Recently'
@@ -340,7 +340,7 @@ export const SettingsConsole: React.FC<{ initialTab?: SettingTab }> = ({ initial
         {activeTab === 'risk' && (
           <div className="space-y-10">
             {/* Live Rate Override (New) */}
-            <div className={`p-6 rounded-3xl border-2 border-dashed ${theme === 'dark' ? 'bg-blue-500/5 border-blue-500/20' : 'bg-blue-50 border-blue-200'}`}>
+            <div className={`p-6 rounded-3xl border-2 border-dashed ${theme === 'dark' ? 'bg-blue-500/5 border-slate-200 dark:border-zinc-800' : 'bg-blue-50 border-blue-200'}`}>
                <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <TrendingUp className="w-5 h-5 text-blue-500" />
@@ -355,10 +355,10 @@ export const SettingsConsole: React.FC<{ initialTab?: SettingTab }> = ({ initial
                       type="number"
                       value={globalParams.fxRate}
                       onChange={(e) => setGlobalParams({...globalParams, fxRate: parseFloat(e.target.value)})}
-                      className="w-full bg-slate-950 border border-white/10 rounded-2xl px-5 py-4 text-sm font-black text-white focus:outline-none focus:border-blue-500"
+                      className="w-full bg-slate-950 border border-slate-200 dark:border-zinc-800 rounded-2xl px-5 py-4 text-sm font-black text-white focus:outline-none focus:border-blue-500"
                     />
                   </div>
-                  <div className={`px-6 py-4 rounded-2xl border ${theme === 'dark' ? 'bg-slate-900 border-white/5' : 'bg-white border-slate-200'}`}>
+                  <div className={`px-6 py-4 rounded-2xl border ${theme === 'dark' ? 'bg-zinc-900/90 border-zinc-800 shadow-none' : 'bg-white border-slate-200'}`}>
                     <p className="text-[9px] font-black text-slate-500 uppercase mb-1">Effective Pulse</p>
                     <p className="text-xs font-mono font-bold text-blue-500">₦{globalParams.fxRate.toLocaleString()}</p>
                   </div>
@@ -377,7 +377,7 @@ export const SettingsConsole: React.FC<{ initialTab?: SettingTab }> = ({ initial
                       className={`py-3 rounded-xl border text-[10px] font-black transition-all ${
                         defaultCurrency === curr.code
                           ? 'bg-blue-600 border-blue-500 text-white shadow-lg'
-                          : theme === 'dark' ? 'bg-slate-950 border-white/10 text-slate-500 hover:text-white' : 'bg-white border-slate-200 text-slate-600'
+                          : theme === 'dark' ? 'bg-slate-950 border-slate-200 dark:border-zinc-800 text-slate-500 hover:text-white' : 'bg-white border-slate-200 text-slate-600'
                       }`}
                     >
                       {curr.code} ({curr.symbol})
@@ -516,7 +516,7 @@ export const SettingsConsole: React.FC<{ initialTab?: SettingTab }> = ({ initial
                     <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border transition-all ${
                       req.type === 'PDF' ? 'bg-rose-500/10 border-rose-500/20 text-rose-500' :
                       req.type === 'IMAGE' ? 'bg-amber-500/10 border-amber-500/20 text-amber-500' :
-                      req.type === 'DOC' ? 'bg-blue-500/10 border-blue-500/20 text-blue-500' :
+                      req.type === 'DOC' ? 'bg-blue-500/10 border-slate-200 dark:border-zinc-800 text-blue-500' :
                       'bg-emerald-500/10 border-emerald-500/20 text-emerald-500'
                     }`}>
                       <FileText className="w-6 h-6" />
@@ -586,7 +586,7 @@ export const SettingsConsole: React.FC<{ initialTab?: SettingTab }> = ({ initial
                       value={newBankForm.bankName}
                       onChange={e => setNewBankForm({...newBankForm, bankName: e.target.value})}
                       placeholder="e.g. Mono, Okra, Parallex"
-                      className="w-full bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-xs font-bold text-white focus:outline-none focus:border-blue-500"
+                      className="w-full bg-slate-900 border border-slate-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-xs font-bold text-white focus:outline-none focus:border-blue-500"
                     />
                   </div>
                   <div className="space-y-2">
@@ -781,7 +781,7 @@ const RequirementItemModal: React.FC<{
                 value={form.label}
                 onChange={e => setForm({...form, label: e.target.value})}
                 placeholder="e.g. International Passport Data Page"
-                className="w-full bg-slate-950 border border-white/10 rounded-2xl px-5 py-4 text-xs font-bold text-white focus:outline-none focus:border-blue-500 transition-all"
+                className="w-full bg-slate-950 border border-slate-200 dark:border-zinc-800 rounded-2xl px-5 py-4 text-xs font-bold text-white focus:outline-none focus:border-blue-500 transition-all"
               />
             </div>
             <div className="space-y-2">
@@ -954,7 +954,7 @@ const TrashManager: React.FC = () => {
       const response: any = await deleteUserFn({ targetUid: uid });
 
       if (response.data?.success) {
-        toast.success("System records successfully purged.", { id: t });
+        toast.success("Deleted successfully", { id: t });
       } else {
         throw new Error(response.data?.message || "Purge failed");
       }
@@ -999,7 +999,7 @@ const TrashManager: React.FC = () => {
            {archivedUsers.map(user => {
              const daysLeft = calculateDaysLeft(user.archivedAt);
              return (
-               <div key={user.id} className="p-6 rounded-3xl bg-slate-950/40 border border-white/5 space-y-4 relative overflow-hidden group">
+               <div key={user.id} className="p-6 rounded-3xl bg-zinc-900/90 border-zinc-800 shadow-none space-y-4 relative overflow-hidden group">
                   <div className="flex justify-between items-start">
                      <div className="flex items-center gap-3">
                         <div className="w-12 h-12 rounded-xl bg-slate-800 flex items-center justify-center text-amber-500 shrink-0">

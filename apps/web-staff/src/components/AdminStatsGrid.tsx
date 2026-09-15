@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Users,
   CheckCircle2,
@@ -61,7 +61,7 @@ export const AdminStatsGrid: React.FC<AdminStatsGridProps> = ({
     { label: "Total Students", value: stats.total, icon: Users, color: "text-slate-600 dark:text-slate-300", description: "Authorized student profiles", filterId: 'ALL' },
     { label: "Cleared", value: stats.cleared, icon: CheckCircle2, color: "text-emerald-600 dark:text-emerald-400", description: "Full POF maturity reached", filterId: 'CLEARED' },
     { label: "Top Up Required", value: stats.topUpRequired, icon: Zap, color: "text-amber-600 dark:text-amber-400", description: "Funding needed or pending", filterId: 'TOPUP_PENDING' },
-    { label: "Almost Done", value: stats.nearMaturity, icon: Clock, color: "text-cyan-600 dark:text-cyan-400", description: "Near 28-day maturity", filterId: 'NEAR_MATURITY' },
+    { label: "Almost Done", value: stats.nearMaturity, icon: Clock, color: "text-indigo-600 dark:text-indigo-400", description: "Near 28-day maturity", filterId: 'NEAR_MATURITY' },
     { label: "Auth Failed", value: stats.authFailed, icon: ShieldAlert, color: "text-rose-600 dark:text-rose-500", description: "Verification failed or pending", filterId: 'UNAPPROVED' },
     ...(stats.incomplete > 0 ? [{ label: "Incomplete", value: stats.incomplete, icon: Loader2, color: "text-slate-600 dark:text-slate-400", description: "Awaiting setup completion", filterId: 'INCOMPLETE' }] : []),
   ];
@@ -80,7 +80,7 @@ export const AdminStatsGrid: React.FC<AdminStatsGridProps> = ({
       <div className="md:hidden">
         <button
           onClick={() => setIsMetricsExpanded(!isMetricsExpanded)}
-          className="w-full glass-card p-4 flex items-center justify-between border border-white/10 rounded-2xl bg-slate-900/80 backdrop-blur-md shadow-xl transition-all active:scale-[0.98]"
+          className="w-full glass-card p-4 flex items-center justify-between border border-slate-200 dark:border-zinc-800 bg-slate-900/80 backdrop-blur-md shadow-xl transition-all active:scale-[0.98]"
         >
           <div className="flex items-center gap-4">
             <div className={`p-2 rounded-xl bg-slate-950 border border-white/5 ${activeStat.color}`}>
@@ -91,7 +91,7 @@ export const AdminStatsGrid: React.FC<AdminStatsGridProps> = ({
               <p className="text-xl font-black text-white leading-none mt-1">{activeStat.value}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-blue-600/20 border border-blue-500/30 text-blue-400">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-800/40 border border-slate-200 dark:border-zinc-800 text-slate-400">
              <BarChart3 className="w-3.5 h-3.5" />
              <span className="text-[9px] font-black uppercase tracking-widest">
                {isMetricsExpanded ? 'Collapse' : 'Expand'} ({statConfigs.length})
@@ -149,7 +149,7 @@ const StatCardComponent: React.FC<{
       className={`glass-card p-3 sm:p-4 text-left transition-all duration-300 relative overflow-hidden group flex flex-col justify-between w-full border ${
         isActive
           ? 'ring-2 ring-amber-500 bg-amber-500/10 border-amber-500/30'
-          : 'hover:border-white/20'
+          : 'hover:border-slate-200 dark:hover:border-zinc-800'
       }`}
     >
       <div className="flex justify-between items-start">

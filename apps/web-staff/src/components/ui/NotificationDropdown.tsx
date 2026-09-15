@@ -5,7 +5,7 @@ import {
   UserPlus,
   Zap,
   ShieldAlert,
-  Settings2,
+  Settings,
   ChevronLeft,
   ChevronRight,
   CheckCheck,
@@ -173,7 +173,7 @@ export const NotificationDropdown: React.FC = () => {
     if (t.includes('USER') || t.includes('STUDENT')) return <UserPlus className="w-4 h-4 text-emerald-400" />;
     if (t.includes('TOP_UP') || t.includes('ADJUST')) return <Zap className="w-4 h-4 text-amber-400" />;
     if (t.includes('ANOMALY') || t.includes('FLAG') || t.includes('RISK')) return <ShieldAlert className="w-4 h-4 text-rose-400" />;
-    if (t.includes('OVERRIDE') || t.includes('CONFIG') || t.includes('UPDATE')) return <Settings2 className="w-4 h-4 text-cyan-400" />;
+    if (t.includes('OVERRIDE') || t.includes('CONFIG') || t.includes('UPDATE')) return <Settings className="w-4 h-4 text-cyan-400" />;
     return <History className="w-4 h-4 text-slate-400" />;
   };
 
@@ -186,7 +186,7 @@ export const NotificationDropdown: React.FC = () => {
           isOpen
             ? 'bg-amber-500/10 border-amber-500/40 text-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.1)]'
             : hasFreshNotification
-              ? 'bg-blue-500/10 border-blue-500/40 text-blue-500 animate-pulse shadow-[0_0_15px_rgba(59,130,246,0.4)]'
+              ? 'bg-blue-500/10 border-slate-200 dark:border-zinc-800 text-blue-500 animate-pulse shadow-none'
               : unreadCount > 0
                 ? 'bg-amber-500/10 border-amber-500/40 text-amber-500 animate-pulse shadow-[0_0_15px_rgba(245,158,11,0.4)]'
                 : 'bg-white/5 border-white/5 text-slate-300 hover:text-white'
@@ -200,7 +200,7 @@ export const NotificationDropdown: React.FC = () => {
 
       {/* Dropdown Window (Positioned under Bell) */}
       {isOpen && (
-        <div className="absolute right-0 mt-3 w-80 bg-white border-slate-200 dark:bg-slate-900 dark:border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.8)] z-[500] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-top-right">
+        <div className="absolute right-0 mt-3 w-80 bg-white border-slate-200 dark:bg-slate-900 dark:border-zinc-800 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.8)] z-[500] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-top-right">
           {/* Header */}
           <div className={`p-4 border-b flex justify-between items-center ${isDark ? 'bg-slate-950/40 border-white/5' : 'bg-slate-50 border-slate-100'}`}>
             <div className="flex items-center gap-2">

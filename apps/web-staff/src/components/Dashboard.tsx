@@ -37,7 +37,7 @@ import {
   AlertCircle,
   ShieldAlert,
   Loader2,
-  Settings2,
+  Settings,
   Trash2,
   Save,
   Sparkles,
@@ -48,8 +48,6 @@ import {
   History
 } from 'lucide-react';
 import { DashboardSkeleton } from './ui/LoadingStates';
-import { ManualOverrideModal } from './ManualOverrideModal';
-import { AdminTimerModal } from './AdminTimerModal';
 import { AddStudentModal } from './AddStudentModal';
 import { AdminStudentProfileDrawer } from './AdminStudentProfileDrawer';
 import { useTheme } from '../context/ThemeContext';
@@ -58,6 +56,7 @@ import { StudentTableFilters, FilterCriteria } from './StudentTableFilters';
 import { toast } from 'sonner';
 
 import { resolveUserStatus, ComplianceStatus } from '../services/userStatusService';
+import { LIVE_FX_RATE } from '../constants';
 import { purgeUserClientSide } from '../utils/governanceService';
 import { executeSoftReset } from '../utils/softResetService';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -108,7 +107,7 @@ const StatCard: React.FC<{ label: string; value: number | string; icon: any; col
       onClick={onClick}
       className={`w-full text-left p-3.5 md:p-5 glass-card relative group transition-all ${
         theme === 'dark'
-          ? `${isActive ? 'border-amber-500/50 bg-amber-500/10 shadow-lg shadow-amber-500/5' : 'hover:border-white/20'}`
+          ? `${isActive ? 'border-amber-500/50 bg-amber-500/10 shadow-lg shadow-amber-500/5' : 'hover:border-slate-200 dark:hover:border-zinc-800'}`
           : `bg-white border-slate-200 shadow-sm ${isActive ? 'border-amber-500 ring-2 ring-amber-500/10' : 'hover:border-slate-300'}`
       }`}
     >
@@ -116,7 +115,7 @@ const StatCard: React.FC<{ label: string; value: number | string; icon: any; col
         <Icon className="w-12 h-12 md:w-16 md:h-16" />
       </div>
       <div className={`p-1.5 md:p-2 rounded-lg border w-fit mb-2 md:mb-3 ${color} ${
-        theme === 'dark' ? 'bg-slate-950 border-white/5' : 'bg-slate-50 border-slate-200'
+        theme === 'dark' ? 'bg-slate-950 border-slate-200 dark:border-zinc-800' : 'bg-slate-50 border-slate-200'
       }`}>
         <Icon className="w-4 h-4 md:w-5 h-5" />
       </div>
@@ -134,12 +133,12 @@ const StatusBadge: React.FC<{ status: ComplianceStatus; isNew?: boolean }> = ({ 
   const styles: Record<string, string> = {
     CLEARED: theme === 'dark' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-emerald-50 text-emerald-600 border-emerald-200',
     NEEDS_TOPUP: theme === 'dark' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-amber-50 text-amber-600 border-amber-200',
-    NEAR_MATURITY: theme === 'dark' ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20' : 'bg-cyan-50 text-cyan-600 border-cyan-200',
-    AT_RISK: theme === 'dark' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 'bg-rose-50 text-rose-600 border-rose-200',
-    PENDING: theme === 'dark' ? 'bg-slate-500/10 text-slate-400 border-slate-500/20' : 'bg-slate-50 text-slate-500 border-slate-200',
-    NEW: theme === 'dark' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' : 'bg-indigo-50 text-indigo-600 border-indigo-200',
-    PENDING_ONBOARDING: theme === 'dark' ? 'bg-slate-800 text-slate-500 border-white/5' : 'bg-slate-100 text-slate-400 border-slate-200',
-    AWAITING_VERIFICATION: theme === 'dark' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-blue-50 text-blue-600 border-blue-200',
+    NEAR_MATURITY: theme === 'dark' ? 'bg-indigo-500/10 text-indigo-400 border-zinc-800' : 'bg-indigo-50 text-indigo-600 border-indigo-200',
+    AT_RISK: theme === 'dark' ? 'bg-rose-500/10 text-rose-400 border-zinc-800' : 'bg-rose-50 text-rose-600 border-rose-200',
+    PENDING: theme === 'dark' ? 'bg-slate-500/10 text-slate-400 border-zinc-800' : 'bg-slate-50 text-slate-500 border-slate-200',
+    NEW: theme === 'dark' ? 'bg-indigo-500/10 text-indigo-400 border-zinc-800' : 'bg-indigo-50 text-indigo-600 border-indigo-200',
+    PENDING_ONBOARDING: theme === 'dark' ? 'bg-zinc-800 text-slate-500 border-zinc-700' : 'bg-slate-100 text-slate-400 border-slate-200',
+    AWAITING_VERIFICATION: theme === 'dark' ? 'bg-indigo-500/10 text-indigo-400 border-zinc-800' : 'bg-indigo-50 text-indigo-600 border-indigo-200',
     UNAUTHENTICATED: theme === 'dark' ? 'bg-rose-600/20 text-rose-500 border-rose-600/30 shadow-lg shadow-rose-900/10' : 'bg-rose-50 text-rose-700 border-rose-200 shadow-sm',
     TOPUP_PENDING: theme === 'dark' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-amber-50 text-amber-600 border-amber-200',
   };
@@ -168,7 +167,7 @@ const StatusBadge: React.FC<{ status: ComplianceStatus; isNew?: boolean }> = ({ 
 interface StaffDashboardProps {
   onInspect?: (id: string) => void;
   onMessageStudent?: (id: string) => void;
-  onViewProfile?: (student: any) => void;
+  onViewProfile?: (student: any, tab?: 'profile' | 'activity' | 'documents' | 'governance') => void;
 }
 
 const HistoryLogModal: React.FC<{ isOpen: boolean; onClose: () => void; student: Student | null }> = ({ isOpen, onClose, student }) => {
@@ -203,7 +202,7 @@ const HistoryLogModal: React.FC<{ isOpen: boolean; onClose: () => void; student:
   return (
     <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-300">
       <div className="w-full max-w-2xl max-h-[80vh] glass-card flex flex-col animate-in zoom-in-95 duration-300 shadow-2xl overflow-hidden">
-        <div className={`p-6 border-b flex justify-between items-center ${theme === 'dark' ? 'bg-slate-950/20 border-white/5' : 'bg-slate-50 border-slate-100'}`}>
+        <div className={`p-6 border-b flex justify-between items-center ${theme === 'dark' ? 'bg-slate-950/20 border-slate-200 dark:border-zinc-800' : 'bg-slate-50 border-slate-100'}`}>
           <div className="flex items-center gap-3">
             <Activity className="w-5 h-5 text-cyan-500" />
             <h3 className={`text-xl font-black uppercase tracking-tight ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Audit Trail: {student?.name}</h3>
@@ -227,7 +226,7 @@ const HistoryLogModal: React.FC<{ isOpen: boolean; onClose: () => void; student:
             <div className="space-y-3">
               {logs.map(log => (
                 <div key={log.id} className={`p-4 rounded-2xl border transition-all ${
-                  theme === 'dark' ? 'bg-slate-900/40 border-white/5' : 'bg-slate-50 border-slate-200 shadow-sm'
+                  theme === 'dark' ? 'bg-zinc-900/90 border-zinc-800 shadow-none' : 'bg-slate-50 border-slate-200 shadow-sm'
                 }`}>
                   <div className="flex justify-between items-start mb-1">
                     <span className={`text-[10px] font-black uppercase tracking-widest ${
@@ -283,10 +282,7 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({ onInspect, onMes
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
   // Modal & Drawer State
-  const [isOverrideOpen, setIsOverrideOpen] = useState(false);
-  const [isTimerModalOpen, setIsTimerModalOpen] = useState(false);
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isMetricsExpanded, setIsMetricsExpanded] = useState(false);
 
@@ -297,17 +293,6 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({ onInspect, onMes
   // Request Handling State
   const [modifyingRequest, setModifyingRequest] = useState<boolean>(false);
   const [modValue, setModValue] = useState<string>('');
-
-  // Form State for Editing
-  const [editFormData, setEditFormData] = useState({
-    name: '',
-    balanceGbp: 0,
-    targetGbp: 0,
-    consecutiveDays: 0,
-    totalTargetDays: 28,
-    visaRoute: '',
-    counselor: 'Unassigned'
-  });
 
   const isAdmin = role === 'ADMIN_GOVERNANCE';
 
@@ -331,6 +316,11 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({ onInspect, onMes
         // Determine status if not explicitly set
         let status = (d.status || 'PENDING') as any;
         if (status === 'VALIDATED') status = 'CLEARED';
+
+        // Force status back to PENDING if target is missing, to prevent accidental clearance
+        if (status === 'CLEARED' && (d.targetGBP || 0) <= 0) {
+          status = 'PENDING';
+        }
 
         // "Almost Done" logic: users with less than 7 days left to reach 28
         if (days >= 22 && days < 28 && status !== 'CLEARED') status = 'NEAR_MATURITY';
@@ -394,7 +384,7 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({ onInspect, onMes
 
   // 4. Merge data
   const liveStudents = useMemo(() => {
-    const LIVE_FX = 1945.50;
+    const LIVE_FX = LIVE_FX_RATE;
 
     // Start with existing student evaluations
     const merged: Student[] = students.filter(s => {
@@ -443,6 +433,7 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({ onInspect, onMes
         status: s.status,
         anomalyRatio: s.anomalyRatio,
         consecutiveDays: s.consecutiveDays || 0,
+        targetGbp: s.targetGbp,
         verificationFailed: userProfile?.verificationFailed
       });
 
@@ -483,7 +474,8 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({ onInspect, onMes
           isApproved,
           onboardingComplete,
           verificationFailed: u.verificationFailed,
-          status: u.status
+          status: u.status,
+          targetGbp: u.onboardingProfile?.targetGbp || 0
         });
 
         merged.push({
@@ -656,17 +648,12 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({ onInspect, onMes
 
   const totalPages = Math.ceil(filteredStudents.length / pageSize);
 
-  const handleApprove = async (student: Student) => {
+  const handleApproveAccess = async (student: Student) => {
     const targetUid = student.userId || student.id;
-
-    if (!targetUid) {
-      toast.error("Target user ID not found.");
-      return;
-    }
+    if (!targetUid) return;
 
     setIsSubmitting(true);
     try {
-      // 1. Perspective: Account Access Approval
       await setDoc(doc(db, 'users', targetUid), {
         isApproved: true,
         setupCompleted: true,
@@ -683,55 +670,66 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({ onInspect, onMes
         createdAt: serverTimestamp()
       });
 
-      // 2. Perspective: Manual Compliance Clearance (if student is already approved or being cleared)
-      if (student.status !== 'CLEARED') {
-        const evalRef = collection(db, 'pof_evaluations');
-        const q = query(evalRef, where('userId', '==', targetUid));
-        const snap = await getDocs(q);
+      toast.success(`Access approved for ${student.name}`);
+      setSelectedStudent(null);
+    } catch (e: any) {
+      toast.error(`Operation failed: ${e.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
-        if (!snap.empty) {
-          await updateDoc(doc(db, 'pof_evaluations', snap.docs[0].id), {
-            status: 'CLEARED',
-            isApproved: true,
-            updatedAt: serverTimestamp()
-          });
-        } else {
-          // If no eval doc exists, create one
-          await addDoc(collection(db, 'pof_evaluations'), {
-            userId: targetUid,
-            name: student.name,
-            email: student.email,
-            status: 'CLEARED',
-            isApproved: true,
-            balanceGbp: student.balanceGbp || 0,
-            targetGbp: student.targetGbp || 0,
-            anomalyRatio: 0,
-            consecutiveDays: 28,
-            verifiedAt: serverTimestamp(),
-            createdAt: serverTimestamp()
-          });
-        }
+  const handleClearCompliance = async (student: Student) => {
+    const targetUid = student.userId || student.id;
+    if (!targetUid) return;
 
-        await setDoc(doc(db, 'users', targetUid), {
+    setIsSubmitting(true);
+    try {
+      const evalRef = collection(db, 'pof_evaluations');
+      const q = query(evalRef, where('userId', '==', targetUid));
+      const snap = await getDocs(q);
+
+      if (!snap.empty) {
+        await updateDoc(doc(db, 'pof_evaluations', snap.docs[0].id), {
           status: 'CLEARED',
           isApproved: true,
+          consecutiveDays: 28, // Force maturity for manual clearance
           updatedAt: serverTimestamp()
-        }, { merge: true });
-
-        await addDoc(collection(db, 'audit_logs'), {
-          actor: appUser?.displayName || 'Admin',
-          action: 'COMPLIANCE_CLEARED',
-          detail: `Cleared compliance for ${student.name}`,
-          studentId: targetUid,
+        });
+      } else {
+        await addDoc(collection(db, 'pof_evaluations'), {
+          userId: targetUid,
+          name: student.name,
+          email: student.email,
+          status: 'CLEARED',
+          isApproved: true,
+          balanceGbp: student.balanceGbp || 0,
+          targetGbp: student.targetGbp || 0,
+          anomalyRatio: 0,
+          consecutiveDays: 28,
+          verifiedAt: serverTimestamp(),
           createdAt: serverTimestamp()
         });
       }
 
-      toast.success(`Access & clearance updated for ${student.name}`);
+      await setDoc(doc(db, 'users', targetUid), {
+        status: 'CLEARED',
+        isApproved: true,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+
+      await addDoc(collection(db, 'audit_logs'), {
+        actor: appUser?.displayName || 'Admin',
+        action: 'COMPLIANCE_CLEARED',
+        detail: `Manually cleared compliance for ${student.name}`,
+        studentId: targetUid,
+        createdAt: serverTimestamp()
+      });
+
+      toast.success(`Compliance manually cleared for ${student.name}`);
       setSelectedStudent(null);
     } catch (e: any) {
-      console.error('Approval error:', e);
-      toast.error(`Operation failed: ${e.message}`);
+      toast.error(`Clearance failed: ${e.message}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -755,7 +753,7 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({ onInspect, onMes
             accountName: student.name,
             accountNumberMasked: '•••• SYST',
             accountType: 'SAVINGS',
-            balanceNgn: Math.round(finalVal * 1945.50), // Convert GBP to NGN for storage
+            balanceNgn: Math.round(finalVal * LIVE_FX_RATE), // Convert GBP to NGN for storage
             balanceGBP: finalVal,
             connectionMethod: 'MANUAL_DEPOSIT',
             status: 'VERIFIED',
@@ -801,43 +799,6 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({ onInspect, onMes
       setSelectedStudent(null);
     } catch (e) {
       console.error('Process request error:', e);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleSaveEdit = async () => {
-    if (!selectedStudent) return;
-    setIsSubmitting(true);
-    const targetUid = selectedStudent.userId || selectedStudent.id;
-    try {
-      const updates = {
-        userName: editFormData.name,
-        targetGBP: editFormData.targetGbp,
-        currentBalanceGBP: editFormData.balanceGbp,
-        startDate: new Date(new Date().setDate(new Date().getDate() - editFormData.consecutiveDays + 1)).toISOString().split('T')[0],
-        updatedAt: serverTimestamp()
-      };
-
-      const evalQ = query(collection(db, 'pof_evaluations'), where('userId', '==', targetUid));
-      const evalSnap = await getDocs(evalQ);
-
-      if (!evalSnap.empty) {
-        await updateDoc(doc(db, 'pof_evaluations', evalSnap.docs[0].id), updates);
-      } else {
-        await setDoc(doc(db, 'pof_evaluations', targetUid), {
-          ...updates,
-          userId: targetUid,
-          userEmail: selectedStudent.email || '',
-          createdAt: serverTimestamp()
-        });
-      }
-
-      setIsEditMode(false);
-      toast.success('Student evaluation updated');
-    } catch (e: any) {
-      console.error('Update error:', e);
-      toast.error('Update failed: ' + e.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -941,10 +902,10 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({ onInspect, onMes
         <div className="md:hidden">
           <button
             onClick={() => setIsMetricsExpanded(!isMetricsExpanded)}
-            className="w-full glass-card p-4 flex items-center justify-between border border-white/10 rounded-2xl bg-slate-900/80 backdrop-blur-md shadow-xl transition-all active:scale-[0.98]"
+            className="w-full glass-card p-4 flex items-center justify-between border border-slate-200 dark:border-zinc-800 bg-slate-900/80 backdrop-blur-md shadow-xl transition-all active:scale-[0.98]"
           >
             <div className="flex items-center gap-4">
-              <div className={`p-2 rounded-xl bg-slate-950 border border-white/5 ${activeStat.color}`}>
+              <div className={`p-2 rounded-xl bg-slate-950 border border-slate-200 dark:border-zinc-800 ${activeStat.color}`}>
                 <activeStat.icon className="w-5 h-5" />
               </div>
               <div className="text-left">
@@ -952,7 +913,7 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({ onInspect, onMes
                 <p className="text-xl font-black text-main dark:text-white leading-none mt-1">{activeStat.value}</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-blue-600/20 border border-blue-500/30 text-blue-400">
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-blue-600/20 border border-slate-200 dark:border-zinc-800 text-blue-400">
                <BarChart3 className="w-3.5 h-3.5" />
                <span className="text-[9px] font-black uppercase tracking-widest">
                  {isMetricsExpanded ? 'Collapse' : 'Expand'} ({statConfigs.length})
@@ -1012,7 +973,7 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({ onInspect, onMes
            <button
              onClick={() => setIsAddUserOpen(true)}
              className={`flex items-center space-x-1.5 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg depth-btn-gold ${
-               theme === 'dark' ? 'bg-amber-500 text-slate-950 hover:bg-amber-400 shadow-amber-500/20' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-500/20'
+               theme === 'dark' ? 'bg-amber-500 text-slate-950 hover:bg-amber-400 shadow-amber-500/20' : 'bg-blue-600 text-white hover:bg-blue-700'
              }`}
            >
              <UserPlus className="w-3.5 h-3.5" />
@@ -1033,7 +994,7 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({ onInspect, onMes
           <div className="overflow-x-auto">
             {filteredStudents.length === 0 ? (
               <div className="p-20 text-center flex flex-col items-center justify-center space-y-6 animate-in fade-in zoom-in-95 duration-500">
-                <div className="w-24 h-24 rounded-[2.5rem] bg-slate-950/40 border border-white/5 flex items-center justify-center text-slate-500 shadow-2xl">
+                <div className="w-24 h-24 rounded-[2.5rem] bg-slate-950/40 border border-slate-200 dark:border-zinc-800 flex items-center justify-center text-slate-500 shadow-2xl">
                   <SearchX className="w-12 h-12" />
                 </div>
                 <div className="space-y-2 max-w-sm mx-auto">
@@ -1044,7 +1005,7 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({ onInspect, onMes
                 </div>
                 <button
                   onClick={handleResetAllFilters}
-                  className="flex items-center gap-2 px-8 py-3.5 bg-white/5 border border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all text-amber-500"
+                  className="flex items-center gap-2 px-8 py-3.5 bg-white/5 border border-slate-200 dark:border-zinc-800 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all text-amber-500"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
                   Reset All Filters
@@ -1054,7 +1015,7 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({ onInspect, onMes
               <table className="w-full text-left font-sans">
                 <thead>
                   <tr className={`text-[8px] md:text-[10px] font-black uppercase tracking-widest border-b transition-colors ${
-                    theme === 'dark' ? 'bg-slate-950/40 text-slate-500 border-white/5' : 'bg-slate-100 text-slate-600 border-slate-200'
+                    theme === 'dark' ? 'bg-slate-950/40 text-slate-500 border-slate-200 dark:border-zinc-800' : 'bg-slate-100 text-slate-600 border-slate-200'
                   }`}>
                     <th className="px-4 md:px-8 py-3 md:py-5 text-slate-900 dark:text-slate-500 font-extrabold">Student Name</th>
                     <th className="px-4 md:px-8 py-3 md:py-5 text-slate-900 dark:text-slate-500 font-extrabold">Status</th>
@@ -1072,7 +1033,7 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({ onInspect, onMes
                       <td className="px-4 md:px-8 py-4 md:py-6">
                         <div className="flex items-center space-x-3 md:space-x-4">
                           <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full border flex items-center justify-center font-black text-[10px] md:text-xs transition-colors ${
-                            theme === 'dark' ? 'bg-slate-800 border-white/10 text-amber-500' : 'bg-slate-100 border-slate-200 text-amber-600'
+                            theme === 'dark' ? 'bg-slate-800 border-slate-200 dark:border-zinc-800 text-amber-500' : 'bg-slate-100 border-slate-200 text-amber-600'
                           }`}>
                             {student.name.split(' ').map(n => n[0]).join('')}
                           </div>
@@ -1093,7 +1054,7 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({ onInspect, onMes
                             {!student.isApproved && (
                                <span className="inline-block px-1.5 py-0.5 rounded bg-rose-500 text-white text-[7px] font-black uppercase tracking-tighter mt-1 animate-pulse">Waiting Approval</span>
                             )}
-                            <p className="text-[8px] md:text-[10px] font-mono text-slate-500 mt-0.5 truncate max-w-[120px] md:max-w-[150px] uppercase">{student.email || student.id}</p>
+                            <p className="text-[8px] md:text-[10px] font-mono text-slate-500 mt-0.5 truncate max-w-[120px] md:max-w-[150px] uppercase">{student.email || 'NO EMAIL'}</p>
                           </div>
                         </div>
                       </td>
@@ -1160,8 +1121,8 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({ onInspect, onMes
                 disabled={currentPage === 1}
                 className={`p-2 rounded-xl border transition-all ${
                   currentPage === 1
-                    ? 'opacity-30 cursor-not-allowed border-white/5 text-slate-600'
-                    : 'border-white/10 text-slate-400 hover:bg-white/5 hover:text-white active:scale-95'
+                    ? 'opacity-30 cursor-not-allowed border-slate-200 dark:border-zinc-800 text-slate-600'
+                    : 'border-slate-200 dark:border-zinc-800 text-slate-400 hover:bg-white/5 hover:text-white active:scale-95'
                 }`}
               >
                 <ChevronRight className="w-4 h-4 rotate-180" />
@@ -1201,8 +1162,8 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({ onInspect, onMes
                 disabled={currentPage === totalPages}
                 className={`p-2 rounded-xl border transition-all ${
                   currentPage === totalPages
-                    ? 'opacity-30 cursor-not-allowed border-white/5 text-slate-600'
-                    : 'border-white/10 text-slate-400 hover:bg-white/5 hover:text-white active:scale-95'
+                    ? 'opacity-30 cursor-not-allowed border-slate-200 dark:border-zinc-800 text-slate-600'
+                    : 'border-slate-200 dark:border-zinc-800 text-slate-400 hover:bg-white/5 hover:text-white active:scale-95'
                 }`}
               >
                 <ChevronRight className="w-4 h-4" />
@@ -1219,7 +1180,7 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({ onInspect, onMes
             onClick={e => e.stopPropagation()}
           >
             <div className={`sticky top-0 p-6 border-b backdrop-blur-xl z-20 flex justify-between items-center transition-colors ${
-              theme === 'dark' ? 'bg-slate-950/20 border-white/5' : 'bg-white/40 border-slate-100'
+              theme === 'dark' ? 'bg-slate-950/20 border-slate-200 dark:border-zinc-800' : 'bg-white/40 border-slate-100'
             }`}>
               <div>
                 <h3 className="text-xl font-black uppercase tracking-tight">Student Info</h3>
@@ -1233,316 +1194,169 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({ onInspect, onMes
             </div>
 
             <div className="p-6 space-y-8 flex-1">
-              {!isEditMode ? (
-                <>
-                  <div
-                    onClick={() => {
-                      if (onInspect) onInspect(selectedStudent.userId || selectedStudent.id);
-                      setSelectedStudent(null);
-                    }}
-                    className={`border p-6 rounded-[2.5rem] flex items-center space-x-6 cursor-pointer group/card transition-all ${
-                      theme === 'dark' ? 'bg-slate-950 border-white/5 hover:border-amber-500/30' : 'bg-slate-50 border-slate-200 shadow-sm hover:shadow-md'
-                    }`}
-                  >
-                    <div className={`w-20 h-20 rounded-full border flex items-center justify-center font-black text-2xl transition-colors ${
-                      theme === 'dark' ? 'bg-slate-900 border-white/10 text-amber-500' : 'bg-white border-slate-200 text-amber-600'
-                    }`}>
-                      {selectedStudent.name.split(' ').map(n => n[0]).join('')}
-                    </div>
-                    <div>
-                      <h4 className={`text-xl font-black leading-none transition-all group-hover/card:text-amber-500 ${theme === 'dark' ? 'text-white' : 'text-slate-950'}`}>
-                        {selectedStudent.name}
-                      </h4>
-                      <p className="text-xs font-mono text-slate-500 mt-2 uppercase">{selectedStudent.email}</p>
-                      <div className="mt-4 flex items-center gap-2">
-                        <StatusBadge status={selectedStudent.status} isNew={selectedStudent.isNew} />
-                        {!selectedStudent.isApproved && selectedStudent.status !== 'PENDING_ONBOARDING' && (
-                          <span className="px-2 py-1 rounded bg-rose-500 text-white text-[8px] font-black uppercase">Identity Unverified</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4">
-                    <div className={`p-5 rounded-3xl border ${theme === 'dark' ? 'bg-slate-950/40 border-white/5' : 'bg-slate-50 border-slate-200'}`}>
-                      <p className="text-[10px] font-black text-slate-500 uppercase mb-2">Consolidated Total Balance</p>
-                      <p className={`text-xl font-black ${theme === 'dark' ? 'text-white' : 'text-slate-950'}`}>£{selectedStudent.balanceGbp.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h5 className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Compliance Actions</h5>
-
-                    {/* Pending Request Handling */}
-                    {selectedStudent.pendingRequest && (
-                      <div className={`p-6 rounded-[2rem] border-2 border-dashed space-y-4 ${theme === 'dark' ? 'bg-amber-500/5 border-amber-500/20' : 'bg-amber-50 border-amber-500/20'}`}>
-                        <div className="flex items-center justify-between">
-                           <div className="flex items-center gap-2">
-                             <Zap className="w-4 h-4 text-amber-500" />
-                             <span className="text-xs font-black uppercase text-amber-500 tracking-tight">Pending {selectedStudent.pendingRequest.type.replace('_', ' ')}</span>
-                           </div>
-                           <span className="text-[9px] font-mono text-slate-500">{new Date(selectedStudent.pendingRequest.createdAt?.seconds * 1000).toLocaleDateString()}</span>
-                        </div>
-
-                        <div className="p-4 rounded-2xl bg-slate-950/5 dark:bg-slate-950/20 border border-slate-200 dark:border-white/5 space-y-2">
-                          <p className="text-xs font-bold text-main dark:text-white">
-                            Requested: {selectedStudent.pendingRequest.type === 'TOP_UP' ? `£${selectedStudent.pendingRequest.amountGBP}` : `${selectedStudent.pendingRequest.daysRequested} Days`}
-                          </p>
-                          {selectedStudent.pendingRequest.reason && (
-                            <p className="text-[10px] text-slate-500 italic leading-relaxed">"{selectedStudent.pendingRequest.reason}"</p>
-                          )}
-                        </div>
-
-                        {modifyingRequest ? (
-                          <div className="space-y-3 animate-in slide-in-from-top-2 duration-300">
-                             <input
-                               type="number"
-                               placeholder={`New ${selectedStudent.pendingRequest.type === 'TOP_UP' ? 'Amount (£)' : 'Days'}`}
-                               value={modValue}
-                               onChange={e => setModValue(e.target.value)}
-                               className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-3 text-xs font-bold text-white focus:outline-none focus:border-amber-500"
-                             />
-                             <div className="flex gap-2">
-                               <button onClick={() => handleProcessRequest(selectedStudent, 'APPROVE', parseFloat(modValue))} className="flex-1 py-3 bg-amber-500 text-slate-950 rounded-xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all">Confirm & Approve</button>
-                               <button onClick={() => setModifyingRequest(false)} className="px-4 py-3 bg-slate-800 text-white rounded-xl font-black text-[10px] uppercase transition-all">Cancel</button>
-                             </div>
-                          </div>
-                        ) : (
-                          <div className="grid grid-cols-2 gap-2">
-                            <button
-                              onClick={() => handleProcessRequest(selectedStudent, 'APPROVE')}
-                              disabled={isSubmitting}
-                              className="col-span-2 py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-500/20 active:scale-95 transition-all flex items-center justify-center gap-2"
-                            >
-                              <CheckCircle2 className="w-4 h-4" /> Quick Approve
-                            </button>
-                            <button
-                              onClick={() => {
-                                setModValue(selectedStudent.pendingRequest?.type === 'TOP_UP' ? String(selectedStudent.pendingRequest.amountGBP) : String(selectedStudent.pendingRequest.daysRequested));
-                                setModifyingRequest(true);
-                              }}
-                              className="py-3 bg-blue-600/10 border border-blue-500/20 text-blue-400 rounded-xl font-black text-[9px] uppercase tracking-widest active:scale-95 transition-all"
-                            >
-                              Modify Amount
-                            </button>
-                            <button
-                              onClick={() => handleProcessRequest(selectedStudent, 'REJECT')}
-                              className="py-3 bg-rose-600/10 border border-rose-500/20 text-rose-400 rounded-xl font-black text-[9px] uppercase tracking-widest active:scale-95 transition-all"
-                            >
-                              Reject Request
-                            </button>
-                          </div>
-                        )}
-                      </div>
+              <div
+                onClick={() => {
+                  if (onInspect) onInspect(selectedStudent.userId || selectedStudent.id);
+                  setSelectedStudent(null);
+                }}
+                className={`border p-6 rounded-[2.5rem] flex items-center space-x-6 cursor-pointer group/card transition-all ${
+                  theme === 'dark' ? 'bg-slate-950 border-slate-200 dark:border-zinc-800 hover:border-amber-500/30' : 'bg-slate-50 border-slate-200 shadow-sm hover:shadow-md'
+                }`}
+              >
+                <div className={`w-20 h-20 rounded-full border flex items-center justify-center font-black text-2xl transition-colors ${
+                  theme === 'dark' ? 'bg-slate-900 border-slate-200 dark:border-zinc-800 text-amber-500' : 'bg-white border-slate-200 text-amber-600'
+                }`}>
+                  {selectedStudent.name.split(' ').map(n => n[0]).join('')}
+                </div>
+                <div>
+                  <h4 className={`text-xl font-black leading-none transition-all group-hover/card:text-amber-500 ${theme === 'dark' ? 'text-white' : 'text-slate-950'}`}>
+                    {selectedStudent.name}
+                  </h4>
+                  <p className="text-xs font-mono text-slate-500 mt-2 uppercase">{selectedStudent.email}</p>
+                  <div className="mt-4 flex items-center gap-2">
+                    <StatusBadge status={selectedStudent.status} isNew={selectedStudent.isNew} />
+                    {!selectedStudent.isApproved && selectedStudent.status !== 'PENDING_ONBOARDING' && (
+                      <span className="px-2 py-1 rounded bg-rose-500 text-white text-[8px] font-black uppercase">Identity Unverified</span>
                     )}
-
-                    {!selectedStudent.isApproved && (
-                      <button
-                        onClick={async () => {
-                          handleApprove(selectedStudent);
-                        }}
-                        disabled={isSubmitting}
-                        className="w-full flex items-center justify-between p-6 bg-gradient-to-tr from-emerald-400 to-emerald-600 rounded-3xl text-slate-950 font-black text-sm uppercase tracking-widest shadow-xl shadow-emerald-500/10 hover:shadow-emerald-500/20 transition-all disabled:opacity-50"
-                      >
-                        {isSubmitting ? <span>Processing...</span> : <span>Approve User Access</span>}
-                        <CheckCircle2 className="w-5 h-5" />
-                      </button>
-                    )}
-
-                    {selectedStudent.status !== 'CLEARED' && selectedStudent.isApproved && (
-                      <button
-                        onClick={() => handleApprove(selectedStudent)}
-                        className="w-full flex items-center justify-between p-6 bg-gradient-to-tr from-amber-400 to-amber-600 rounded-3xl text-slate-950 font-black text-sm uppercase tracking-widest shadow-xl shadow-amber-500/10 hover:shadow-amber-500/20 transition-all"
-                      >
-                        <span>Clear Compliance</span>
-                        <CheckCircle2 className="w-5 h-5" />
-                      </button>
-                    )}
-
-                    <button
-                      onClick={() => {
-                        if (onViewProfile) onViewProfile(selectedStudent);
-                      }}
-                      className={`w-full flex items-center justify-between p-6 border rounded-3xl font-black text-sm uppercase tracking-widest transition-all ${
-                        theme === 'dark' ? 'bg-slate-950 border-white/10 text-slate-200 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm'
-                      }`}
-                    >
-                      <span>View Full Profile</span>
-                      <Eye className="w-5 h-5 text-amber-500" />
-                    </button>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <button
-                        onClick={() => setIsEditMode(true)}
-                        className={`flex items-center justify-between p-6 border rounded-3xl font-black text-sm uppercase tracking-widest transition-all ${
-                          theme === 'dark' ? 'bg-slate-950 border-white/10 text-slate-200 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm'
-                        }`}
-                      >
-                        <span>Edit</span>
-                        <Settings2 className="w-5 h-5 text-blue-500" />
-                      </button>
-                      <button
-                        onClick={handleDeleteProfile}
-                        className={`flex items-center justify-between p-6 border rounded-3xl font-black text-sm uppercase tracking-widest transition-all ${
-                          theme === 'dark' ? 'bg-slate-950 border-white/10 text-slate-200 hover:bg-rose-500/10 hover:text-rose-400' : 'bg-white border-slate-200 text-slate-700 hover:bg-rose-50 hover:text-rose-600 shadow-sm'
-                        }`}
-                      >
-                        <span>Delete</span>
-                        <Trash2 className="w-5 h-5 text-rose-500" />
-                      </button>
-                    </div>
-
-                    <button
-                      onClick={handleSoftReset}
-                      className={`w-full flex items-center justify-between p-6 border rounded-3xl font-black text-sm uppercase tracking-widest transition-all ${
-                        theme === 'dark' ? 'bg-slate-950 border-white/10 text-slate-200 hover:bg-amber-500/10 hover:text-amber-500' : 'bg-white border-slate-200 text-slate-700 hover:bg-amber-50 shadow-sm'
-                      }`}
-                    >
-                      <span>Soft Reset Account</span>
-                      <RefreshCw className="w-5 h-5 text-amber-500" />
-                    </button>
-
-                    <button
-                      onClick={() => setIsHistoryOpen(true)}
-                      className={`w-full flex items-center justify-between p-6 border rounded-3xl font-black text-sm uppercase tracking-widest transition-all ${
-                        theme === 'dark' ? 'bg-slate-950 border-white/10 text-slate-200 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm'
-                      }`}
-                    >
-                      <span>View history</span>
-                      <Activity className="w-5 h-5 text-cyan-500" />
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        if (onMessageStudent && selectedStudent) onMessageStudent(selectedStudent.userId);
-                        setSelectedStudent(null);
-                      }}
-                      className={`w-full flex items-center justify-between p-6 border rounded-3xl font-black text-sm uppercase tracking-widest transition-all ${
-                        theme === 'dark' ? 'bg-slate-950 border-white/10 text-slate-200 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm'
-                      }`}
-                    >
-                      <span>Message Student</span>
-                      <FileText className="w-5 h-5 text-emerald-500" />
-                    </button>
-
-                    <button
-                      onClick={() => setIsOverrideOpen(true)}
-                      className={`w-full flex items-center justify-between p-6 border rounded-3xl font-black text-sm uppercase tracking-widest transition-all ${
-                        theme === 'dark' ? 'bg-slate-950 border-white/10 text-slate-200 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm'
-                      }`}
-                    >
-                      <span>Manual Change</span>
-                      <Settings2 className="w-5 h-5 text-amber-500" />
-                    </button>
-
-                    <button
-                      onClick={() => setIsTimerModalOpen(true)}
-                      className={`w-full flex items-center justify-between p-6 border rounded-3xl font-black text-sm uppercase tracking-widest transition-all ${
-                        theme === 'dark' ? 'bg-slate-950 border-white/10 text-slate-200 hover:bg-amber-500/10 hover:text-amber-500' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm'
-                      }`}
-                    >
-                      <span>Set Expiry Timer</span>
-                      <Clock className="w-5 h-5 text-amber-500" />
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <div className="space-y-6">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2 col-span-2">
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Student Identity</label>
-                      <input
-                        type="text"
-                        value={editFormData.name}
-                        onChange={(e) => setEditFormData({...editFormData, name: e.target.value})}
-                        className={`w-full border rounded-2xl px-4 py-3 text-xs focus:outline-none focus:border-amber-500 ${
-                          theme === 'dark' ? 'bg-slate-950 border-white/10 text-white' : 'bg-slate-50 border-slate-200 text-slate-950'
-                        }`}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Available Balance (£)</label>
-                      <input
-                        type="number"
-                        value={editFormData.balanceGbp}
-                        onChange={(e) => setEditFormData({...editFormData, balanceGbp: parseFloat(e.target.value)})}
-                        className={`w-full border rounded-2xl px-4 py-3 text-xs font-bold focus:outline-none focus:border-amber-500 ${
-                          theme === 'dark' ? 'bg-slate-950 border-white/10 text-emerald-400' : 'bg-slate-50 border-slate-200 text-emerald-600'
-                        }`}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Required Target (£)</label>
-                      <input
-                        type="number"
-                        value={editFormData.targetGbp}
-                        onChange={(e) => setEditFormData({...editFormData, targetGbp: parseFloat(e.target.value)})}
-                        className={`w-full border rounded-2xl px-4 py-3 text-xs focus:outline-none focus:border-amber-500 ${
-                          theme === 'dark' ? 'bg-slate-950 border-white/10 text-white' : 'bg-slate-50 border-slate-200 text-slate-950'
-                        }`}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Completed Days</label>
-                      <input
-                        type="number"
-                        value={editFormData.consecutiveDays}
-                        onChange={(e) => setEditFormData({...editFormData, consecutiveDays: parseInt(e.target.value)})}
-                        className={`w-full border rounded-2xl px-4 py-3 text-xs font-bold focus:outline-none focus:border-amber-500 ${
-                          theme === 'dark' ? 'bg-slate-950 border-white/10 text-amber-500' : 'bg-slate-50 border-slate-200 text-amber-600'
-                        }`}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Target Days</label>
-                      <input
-                        type="number"
-                        value={editFormData.totalTargetDays}
-                        onChange={(e) => setEditFormData({...editFormData, totalTargetDays: parseInt(e.target.value)})}
-                        className={`w-full border rounded-2xl px-4 py-3 text-xs focus:outline-none focus:border-amber-500 ${
-                          theme === 'dark' ? 'bg-slate-950 border-white/10 text-white' : 'bg-slate-50 border-slate-200 text-slate-950'
-                        }`}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex gap-4">
-                    <button
-                      onClick={() => setIsEditMode(false)}
-                      className={`flex-1 px-6 py-4 rounded-2xl border font-bold text-xs uppercase tracking-widest transition-all ${
-                        theme === 'dark' ? 'border-white/10 text-slate-400 hover:bg-white/5' : 'border-slate-200 text-slate-500 hover:bg-slate-50'
-                      }`}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleSaveEdit}
-                      disabled={isSubmitting}
-                      className="flex-1 flex items-center justify-center space-x-3 px-6 py-4 bg-gradient-to-tr from-amber-400 to-amber-600 text-slate-950 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-amber-500/10 active:scale-95"
-                    >
-                      {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                      <span>Save Changes</span>
-                    </button>
                   </div>
                 </div>
-              )}
+              </div>
+
+              <div className="grid grid-cols-1 gap-4">
+                <div className={`p-5 rounded-3xl border ${theme === 'dark' ? 'bg-slate-950/40 border-slate-200 dark:border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
+                  <p className="text-[10px] font-black text-slate-500 uppercase mb-2">Consolidated Total Balance</p>
+                  <p className={`text-xl font-black ${theme === 'dark' ? 'text-white' : 'text-slate-950'}`}>£{selectedStudent.balanceGbp.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h5 className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Compliance Actions</h5>
+
+                {/* Pending Request Handling */}
+                {selectedStudent.pendingRequest && (
+                  <div className={`p-6 rounded-[2rem] border-2 border-dashed space-y-4 ${theme === 'dark' ? 'bg-amber-500/5 border-amber-500/20' : 'bg-amber-50 border-amber-500/20'}`}>
+                    <div className="flex items-center justify-between">
+                       <div className="flex items-center gap-2">
+                         <Zap className="w-4 h-4 text-amber-500" />
+                         <span className="text-xs font-black uppercase text-amber-500 tracking-tight">Pending {selectedStudent.pendingRequest.type.replace('_', ' ')}</span>
+                       </div>
+                       <span className="text-[9px] font-mono text-slate-500">{new Date(selectedStudent.pendingRequest.createdAt?.seconds * 1000).toLocaleDateString()}</span>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-slate-950/5 dark:bg-slate-950/20 border border-slate-200 dark:border-zinc-800 space-y-2">
+                      <p className="text-xs font-bold text-main dark:text-white">
+                        Requested: {selectedStudent.pendingRequest.type === 'TOP_UP' ? `£${selectedStudent.pendingRequest.amountGBP}` : `${selectedStudent.pendingRequest.daysRequested} Days`}
+                      </p>
+                      {selectedStudent.pendingRequest.reason && (
+                        <p className="text-[10px] text-slate-500 italic leading-relaxed">"{selectedStudent.pendingRequest.reason}"</p>
+                      )}
+                    </div>
+
+                    {modifyingRequest ? (
+                      <div className="space-y-3 animate-in slide-in-from-top-2 duration-300">
+                         <input
+                           type="number"
+                           placeholder={`New ${selectedStudent.pendingRequest.type === 'TOP_UP' ? 'Amount (£)' : 'Days'}`}
+                           value={modValue}
+                           onChange={e => setModValue(e.target.value)}
+                           className="w-full bg-slate-950 border border-slate-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-xs font-bold text-white focus:outline-none focus:border-amber-500"
+                         />
+                         <div className="flex gap-2">
+                           <button onClick={() => handleProcessRequest(selectedStudent, 'APPROVE', parseFloat(modValue))} className="flex-1 py-3 bg-amber-500 text-slate-950 rounded-xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all">Confirm & Approve</button>
+                           <button onClick={() => setModifyingRequest(false)} className="px-4 py-3 bg-slate-800 text-white rounded-xl font-black text-[10px] uppercase transition-all">Cancel</button>
+                         </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => handleProcessRequest(selectedStudent, 'APPROVE')}
+                          disabled={isSubmitting}
+                          className="col-span-2 py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-500/20 active:scale-95 transition-all flex items-center justify-center gap-2"
+                        >
+                          <CheckCircle2 className="w-4 h-4" /> Quick Approve
+                        </button>
+                        <button
+                          onClick={() => {
+                            setModValue(selectedStudent.pendingRequest?.type === 'TOP_UP' ? String(selectedStudent.pendingRequest.amountGBP) : String(selectedStudent.pendingRequest.daysRequested));
+                            setModifyingRequest(true);
+                          }}
+                          className="py-3 bg-blue-600/10 border border-blue-500/20 text-blue-400 rounded-xl font-black text-[9px] uppercase tracking-widest active:scale-95 transition-all"
+                        >
+                          Modify Amount
+                        </button>
+                        <button
+                          onClick={() => handleProcessRequest(selectedStudent, 'REJECT')}
+                          className="py-3 bg-rose-600/10 border border-rose-500/20 text-rose-400 rounded-xl font-black text-[9px] uppercase tracking-widest active:scale-95 transition-all"
+                        >
+                          Reject Request
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {!selectedStudent.isApproved && (
+                  <button
+                    onClick={async () => {
+                      handleApproveAccess(selectedStudent);
+                    }}
+                    disabled={isSubmitting}
+                    className="w-full flex items-center justify-between p-6 bg-gradient-to-tr from-emerald-400 to-emerald-600 rounded-3xl text-slate-950 font-black text-sm uppercase tracking-widest shadow-xl shadow-emerald-500/10 hover:shadow-emerald-500/20 transition-all disabled:opacity-50"
+                  >
+                    {isSubmitting ? <span>Processing...</span> : <span>Approve User Access</span>}
+                    <CheckCircle2 className="w-5 h-5" />
+                  </button>
+                )}
+
+                {selectedStudent.status !== 'CLEARED' && selectedStudent.isApproved && (
+                  <button
+                    onClick={() => handleClearCompliance(selectedStudent)}
+                    className="w-full flex items-center justify-between p-6 bg-gradient-to-tr from-amber-400 to-amber-600 rounded-3xl text-slate-950 font-black text-sm uppercase tracking-widest shadow-xl shadow-emerald-500/10 hover:shadow-emerald-500/20 transition-all"
+                  >
+                    <span>Clear Compliance</span>
+                    <CheckCircle2 className="w-5 h-5" />
+                  </button>
+                )}
+
+                <button
+                  onClick={() => {
+                    if (onViewProfile) onViewProfile(selectedStudent);
+                  }}
+                  className={`w-full flex items-center justify-between p-6 border rounded-3xl font-black text-sm uppercase tracking-widest transition-all ${
+                    theme === 'dark' ? 'bg-slate-950 border-slate-200 dark:border-zinc-800 text-slate-200 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm'
+                  }`}
+                >
+                  <span>View Full Profile</span>
+                  <Eye className="w-5 h-5 text-amber-500" />
+                </button>
+
+                <button
+                  onClick={() => setIsHistoryOpen(true)}
+                  className={`w-full flex items-center justify-between p-6 border rounded-3xl font-black text-sm uppercase tracking-widest transition-all ${
+                    theme === 'dark' ? 'bg-slate-950 border-slate-200 dark:border-zinc-800 text-slate-200 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm'
+                  }`}
+                >
+                  <span>View history</span>
+                  <Activity className="w-5 h-5 text-cyan-500" />
+                </button>
+
+                <button
+                  onClick={() => {
+                    if (onMessageStudent && selectedStudent) onMessageStudent(selectedStudent.userId);
+                    setSelectedStudent(null);
+                  }}
+                  className={`w-full flex items-center justify-between p-6 border rounded-3xl font-black text-sm uppercase tracking-widest transition-all ${
+                    theme === 'dark' ? 'bg-slate-950 border-slate-200 dark:border-zinc-800 text-slate-200 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm'
+                  }`}
+                >
+                  <span>Message Student</span>
+                  <FileText className="w-5 h-5 text-emerald-500" />
+                </button>
+              </div>
             </div>
           </aside>
         </div>
       )}
-
-      <ManualOverrideModal
-        isOpen={isOverrideOpen}
-        onClose={() => setIsOverrideOpen(false)}
-        student={selectedStudent}
-        performedBy={appUser?.email || 'system'}
-      />
-
-      <AdminTimerModal
-        isOpen={isTimerModalOpen}
-        onClose={() => setIsTimerModalOpen(false)}
-        student={selectedStudent}
-      />
 
       <AddStudentModal
         isOpen={isAddUserOpen}

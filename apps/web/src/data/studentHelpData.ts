@@ -119,7 +119,7 @@ export const STUDENT_HELP_DATA: HelpSection[] = [
     title: 'Interactive Button Glossary',
     description:
       'Quick reference for key actions and buttons found throughout the Student Dashboard.',
-    tags: ['buttons', 'glossary', 'sync balance', 'manage submissions', 'update top-up', 'statement'],
+    tags: ['buttons', 'glossary', 'sync balance', 'manage submissions', 'request top up', 'statement'],
     glossaryItems: [
       {
         buttonText: '[ SYNC BALANCE ]',
@@ -132,7 +132,7 @@ export const STUDENT_HELP_DATA: HelpSection[] = [
         locationTip: 'Located in the Document Mandate status card in your primary dashboard.'
       },
       {
-        buttonText: '[ UPDATE TOP-UP ]',
+        buttonText: '[ REQUEST TOP UP ]',
         actionDescription: 'Opens the capital funding adjustment modal to specify a requested top-up sum, view the 2.5% fee breakdown, and attach payment receipts.',
         locationTip: 'Accessible from the Top-Up Request widget and the approved top-up cards.'
       },

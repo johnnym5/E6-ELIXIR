@@ -17,7 +17,6 @@ export const PRE_APPROVED_COUNSELORS = [
   { name: "Izunyon", email: "izunyon.basechaninternational@gmail.com" },
   { name: "Jumai", email: "jumaibasechaninternational@gmail.com" },
   { name: "Nwaiwu Blessing OGE", email: "nwaiwu.basechaninternational@gmail.com" },
-  { name: "Jegbase", email: "jegbase@gmail.com" },
 ];
 
 export interface AppUser {
@@ -116,19 +115,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
           // 2b. Role Hardening: Ensure role is stored in Firestore (Replacing Custom Claims)
           try {
-            const profileSnap = await getDoc(userRef);
-            if (!profileSnap.exists() || profileSnap.data()?.role !== role) {
-              console.log(`[AuthContext] Persisting/Updating role "${role}" in Firestore for ${firebaseUser.email}`);
+            const existingData = profileSnap.data();
+
+            // Respect existing roles set manually in Firestore (Admin/Counselor/Auditor)
+            const persistentRole = existingData?.role as UserRole;
+            const finalRole = (persistentRole && persistentRole !== 'STUDENT') ? persistentRole : role;
+
+            const currentIsApproved = existingData?.isApproved === true;
+
+            // SYNC TRIGGER: Update if document doesn't exist, role changed, OR if basic fields are missing (like email)
+            const needsSync = !profileSnap.exists() ||
+                             existingData?.role !== finalRole ||
+                             !existingData?.email ||
+                             !existingData?.uid;
+
+            if (needsSync) {
+              console.log(`[AuthContext] Syncing profile for ${firebaseUser.email} (Role: ${finalRole})`);
               await setDoc(userRef, {
                 uid: firebaseUser.uid,
                 email: firebaseUser.email,
-                role,
+                role: finalRole,
                 username: derivedUsername,
                 displayName: whitelistedName || firebaseUser.displayName || derivedUsername,
-                isApproved,
+                // NEVER set a previously approved user back to false
+                isApproved: currentIsApproved || isApproved,
                 updatedAt: serverTimestamp(),
                 lastLoginAt: serverTimestamp()
               }, { merge: true });
+            } else {
+              // Always update last login timestamp regardless
+              await updateDoc(userRef, {
+                lastLoginAt: serverTimestamp()
+              }).catch(() => {});
             }
           } catch (roleErr: any) {
             console.warn('[AuthContext] Role persistence check failed:', roleErr.message);

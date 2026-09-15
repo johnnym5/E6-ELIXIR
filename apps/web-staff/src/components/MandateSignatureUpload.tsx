@@ -21,7 +21,7 @@ export const MandateSignatureUpload: React.FC<MandateSignatureUploadProps> = ({ 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div className="text-center space-y-4">
-        <div className="w-20 h-20 rounded-[2rem] bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-500 mx-auto shadow-2xl shadow-blue-500/10">
+        <div className="w-20 h-20 rounded-[2rem] bg-blue-500/10 border border-slate-200 dark:border-zinc-800 flex items-center justify-center text-blue-500 mx-auto shadow-2xl shadow-blue-500/10">
           <FileSignature className="w-10 h-10" />
         </div>
         <div className="max-w-md mx-auto">
@@ -33,7 +33,7 @@ export const MandateSignatureUpload: React.FC<MandateSignatureUploadProps> = ({ 
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="p-6 rounded-3xl bg-white/5 border border-white/10 space-y-4">
+        <div className="p-6 rounded-3xl bg-white/5 border border-slate-200 dark:border-zinc-800 space-y-4">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-500 font-black text-xs">1</div>
             <p className="text-xs font-bold text-slate-300 uppercase tracking-tight">Sign the Printed Form</p>
@@ -42,7 +42,7 @@ export const MandateSignatureUpload: React.FC<MandateSignatureUploadProps> = ({ 
             Ensure your signature matches your official ID. Use a black or blue pen.
           </p>
         </div>
-        <div className="p-6 rounded-3xl bg-white/5 border border-white/10 space-y-4">
+        <div className="p-6 rounded-3xl bg-white/5 border border-slate-200 dark:border-zinc-800 space-y-4">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-500 font-black text-xs">2</div>
             <p className="text-xs font-bold text-slate-300 uppercase tracking-tight">Capture & Upload</p>
@@ -54,7 +54,7 @@ export const MandateSignatureUpload: React.FC<MandateSignatureUploadProps> = ({ 
       </div>
 
       <div className={`p-10 rounded-[2.5rem] border-2 border-dashed transition-all text-center space-y-6 ${
-        uploaded ? 'bg-emerald-500/5 border-emerald-500/30' : 'bg-slate-900/50 border-white/10 hover:border-blue-500/30'
+        uploaded ? 'bg-emerald-500/5 border-emerald-500/30' : 'bg-zinc-900/90 border-zinc-800 shadow-none hover:border-blue-500/30'
       }`}>
         {uploaded ? (
           <div className="space-y-4">
@@ -69,7 +69,7 @@ export const MandateSignatureUpload: React.FC<MandateSignatureUploadProps> = ({ 
           </div>
         ) : (
           <label className="cursor-pointer block space-y-4">
-            <div className="w-16 h-16 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-500 mx-auto group-hover:scale-110 transition-transform">
+            <div className="w-16 h-16 rounded-full bg-blue-500/10 border border-slate-200 dark:border-zinc-800 flex items-center justify-center text-blue-500 mx-auto group-hover:scale-110 transition-transform">
               <Upload className="w-8 h-8" />
             </div>
             <div>

@@ -92,12 +92,12 @@ export const ElectronicLedgerStatementModal: React.FC<ElectronicLedgerStatementM
       <motion.div
         initial={{ scale: 0.95, opacity: 0, y: 20 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
-        className="w-full max-w-5xl h-[85vh] bg-[#030712] border border-white/10 rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden"
+        className="w-full max-w-5xl h-[85vh] bg-[#030712] border border-slate-200 dark:border-zinc-800 rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden"
       >
         {/* Header */}
-        <div className="p-6 md:p-8 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
+        <div className="p-6 md:p-8 border-b border-slate-200 dark:border-zinc-800 flex justify-between items-center bg-white/[0.02]">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-blue-600/10 border border-blue-500/20 flex items-center justify-center text-blue-500">
+            <div className="w-12 h-12 rounded-2xl bg-blue-600/10 border border-slate-200 dark:border-zinc-800 flex items-center justify-center text-blue-500">
               <FileText className="w-6 h-6" />
             </div>
             <div>
@@ -114,19 +114,19 @@ export const ElectronicLedgerStatementModal: React.FC<ElectronicLedgerStatementM
 
         {/* Stats Section */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-6 md:p-8 bg-white/[0.01]">
-          <div className="p-5 rounded-3xl bg-white/5 border border-white/5 space-y-1">
+          <div className="p-5 rounded-3xl bg-white/5 border border-slate-200 dark:border-zinc-800 space-y-1">
             <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Link Date</p>
             <p className="text-lg font-bold text-white uppercase">
               {account.linkDate ? FuzzySmsParser.formatTimestamp(account.linkDate).split(' ')[0] : 'Scanning...'}
             </p>
           </div>
-          <div className="p-5 rounded-3xl bg-white/5 border border-white/5 space-y-1">
+          <div className="p-5 rounded-3xl bg-white/5 border border-slate-200 dark:border-zinc-800 space-y-1">
             <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Total Inflow</p>
             <p className="text-xl font-black text-emerald-500">
               ₦{(account.totalInflowNgn || 0).toLocaleString()}
             </p>
           </div>
-          <div className="p-5 rounded-3xl bg-white/5 border border-white/5 space-y-1">
+          <div className="p-5 rounded-3xl bg-white/5 border border-slate-200 dark:border-zinc-800 space-y-1">
             <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Total Outflow</p>
             <p className="text-xl font-black text-rose-500">
               ₦{(account.totalOutflowNgn || 0).toLocaleString()}
@@ -142,12 +142,12 @@ export const ElectronicLedgerStatementModal: React.FC<ElectronicLedgerStatementM
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               placeholder="Search descriptions..."
-              className="w-full bg-slate-900 border border-white/10 rounded-xl pl-11 pr-4 py-2.5 text-xs font-bold text-white focus:outline-none focus:border-blue-500"
+              className="w-full bg-zinc-900/90 border-zinc-800 shadow-none rounded-xl pl-11 pr-4 py-2.5 text-xs font-bold text-white focus:outline-none focus:border-blue-500"
             />
           </div>
           <button
             onClick={handleExport}
-            className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-blue-500/20 transition-all active:scale-95"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
           >
             <Download className="w-4 h-4" />
             Download PDF
@@ -167,7 +167,7 @@ export const ElectronicLedgerStatementModal: React.FC<ElectronicLedgerStatementM
               <p className="text-[10px] font-black uppercase tracking-[0.3em]">No records found</p>
             </div>
           ) : (
-            <div className="rounded-2xl border border-white/5 overflow-hidden">
+            <div className="rounded-2xl border border-slate-200 dark:border-zinc-800 overflow-hidden">
               <table className="w-full text-left text-xs">
                 <thead className="bg-white/5 text-slate-400 font-black uppercase tracking-widest">
                   <tr>
@@ -178,7 +178,7 @@ export const ElectronicLedgerStatementModal: React.FC<ElectronicLedgerStatementM
                     <th className="px-6 py-4 text-right">Balance (NGN)</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/5 text-slate-300">
+                <tbody className="divide-y divide-zinc-800 text-slate-300">
                   {filteredTransactions.map((txn) => (
                     <tr key={txn.id} className="hover:bg-white/[0.02] transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap font-mono text-[10px]">

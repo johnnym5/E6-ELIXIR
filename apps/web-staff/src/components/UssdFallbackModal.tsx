@@ -18,6 +18,7 @@ import {
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { LIVE_FX_RATE } from '../constants';
 
 interface UssdFallbackModalProps {
   isOpen: boolean;
@@ -85,7 +86,7 @@ export const UssdFallbackModal: React.FC<UssdFallbackModalProps> = ({
     setIsSubmitting(true);
     try {
       const balance = parseFloat(manualBalance);
-      const fxRate = 1945.50; // Use same rate as dashboards
+      const fxRate = LIVE_FX_RATE; // Use same rate as dashboards
 
       await addDoc(collection(db, 'financial_accounts'), {
         userId: currentUser.uid,
@@ -124,11 +125,11 @@ export const UssdFallbackModal: React.FC<UssdFallbackModalProps> = ({
       <div className="w-full max-w-md glass-card overflow-hidden" onClick={e => e.stopPropagation()}>
 
         {/* Header */}
-        <div className={`p-8 border-b flex justify-between items-center ${isDark ? 'border-white/5 bg-slate-950/20' : 'border-slate-100 bg-slate-50'}`}>
+        <div className={`p-8 border-b flex justify-between items-center ${isDark ? 'border-slate-200 dark:border-zinc-800 bg-slate-950/20' : 'border-slate-100 bg-slate-50'}`}>
           <div>
             <div className="flex items-center gap-2 mb-1">
               <h3 className={`text-xl font-black uppercase tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>USSD Fallback</h3>
-              <span className="px-2 py-0.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[8px] font-black uppercase tracking-widest flex items-center gap-1">
+              <span className="px-2 py-0.5 rounded-lg bg-blue-500/10 border border-slate-200 dark:border-zinc-800 text-blue-400 text-[8px] font-black uppercase tracking-widest flex items-center gap-1">
                 <Lock className="w-2.5 h-2.5" />
                 Offline Check
               </span>
@@ -208,7 +209,7 @@ export const UssdFallbackModal: React.FC<UssdFallbackModalProps> = ({
                   </div>
                 </div>
 
-                <div className={`p-4 rounded-2xl border flex items-start gap-3 ${isDark ? 'bg-blue-600/5 border-blue-500/20' : 'bg-blue-50 border-blue-200'}`}>
+                <div className="p-4 rounded-2xl bg-rose-500/5 border border-rose-500/20 flex items-start gap-3">
                   <ShieldCheck className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
                   <p className="text-[9px] text-slate-500 leading-relaxed font-medium">
                     <span className="text-blue-500 font-black">Data Safety:</span> Manual entries are cross-referenced with your next automated sync to maintain ledger integrity.

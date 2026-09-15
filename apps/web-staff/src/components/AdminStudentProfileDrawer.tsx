@@ -1,29 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { modalBackdropVariants, drawerVariants, modalBoxVariants } from '../utils/motionPresets';
-import { BouncyButton } from './ui/BouncyButton';
+import { modalBackdropVariants, drawerVariants } from '../utils/motionPresets';
 import {
-  X as XIcon, Flag, CheckCircle2, User, Globe, CreditCard,
-  Save, Loader2, TrendingUp, Sliders, Activity,
-  Clock, History, ShieldAlert, ChevronRight, Zap,
-  FileText, Plus, Trash2, Edit3, ShieldCheck, Download,
-  ExternalLink, AlertCircle
+  X as XIcon, User, Globe, CreditCard, Save, Loader2, TrendingUp, Sliders, Activity,
+  Clock, History, ShieldAlert, ChevronRight, Zap, FileText, Trash2, Edit3, ShieldCheck,
+  Layers, Settings, X, CheckCircle2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import {
   doc, updateDoc, collection, query, where, orderBy,
-  limit, onSnapshot, serverTimestamp, getDoc, getDocs, setDoc
+  limit, onSnapshot, serverTimestamp, getDocs, setDoc, addDoc
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { toast } from 'sonner';
+import { LIVE_FX_RATE } from '../constants';
+import { resolveCountryCurrency } from '../utils/currencyResolver';
 
 interface AdminStudentProfileDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   student: any;
   onUpdate?: () => void;
-  initialTab?: 'profile' | 'activity' | 'documents';
+  initialTab?: 'profile' | 'activity' | 'documents' | 'governance';
   highlightEventId?: string | null;
 }
 
@@ -43,23 +42,20 @@ export const AdminStudentProfileDrawer: React.FC<AdminStudentProfileDrawerProps>
   student,
   onUpdate,
   initialTab = 'profile',
-  highlightEventId = null
 }) => {
   const { theme } = useTheme();
   const { appUser } = useAuth();
   const isDark = theme === 'dark';
   const [isSaving, setIsSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'profile' | 'activity' | 'documents'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'profile' | 'activity' | 'documents' | 'governance'>(initialTab);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
-
-  // Document Requirement States
-  const [globalRequirements, setGlobalRequirements] = useState<RequirementItem[]>([]);
-  const [hasCustomRequirements, setHasCustomRequirements] = useState(student?.hasCustomRequirements || false);
-  const [customRequirements, setCustomRequirements] = useState<RequirementItem[]>(student?.customDocumentRequirements || []);
+  const [pofEvaluation, setPofEvaluation] = useState<any>(null);
   const [submissions, setSubmissions] = useState<any[]>([]);
-  const [isRequirementModalOpen, setIsRequirementModalOpen] = useState(false);
-  const [editingRequirement, setEditingRequirement] = useState<RequirementItem | null>(null);
+
+  // Task 3: Inline Editing States
+  const [editingField, setEditingField] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState<string>('');
 
   const [editForm, setEditForm] = useState({
     phoneNumber: student?.phoneNumber || '',
@@ -67,755 +63,341 @@ export const AdminStudentProfileDrawer: React.FC<AdminStudentProfileDrawerProps>
     isVerified: student?.isVerified || false,
     topUpFeePercentage: student?.topUpPricingConfig?.topUpFeePercentage || 2.5,
     flatProcessingFeeNgn: student?.topUpPricingConfig?.flatProcessingFeeNgn || 5000,
-    maxAllowedTopUpNgn: student?.topUpPricingConfig?.maxAllowedTopUpNgn || 15000000
+    maxAllowedTopUpNgn: student?.topUpPricingConfig?.maxAllowedTopUpNgn || 15000000,
+    userName: student?.name || '',
+    targetGBP: 0,
+    consecutiveDays: 0,
+    totalTargetDays: 28,
+    manualAmount: 0,
+    manualReason: '',
+    balanceSubMode: 'deposit' as 'deposit' | 'deduct',
+    expirationDate: '',
+    isTimerActive: false,
+    timerCustomMessage: ''
   });
 
-  // Sync tab and form if props change
   useEffect(() => {
-    if (isOpen) {
-      setActiveTab(initialTab);
-    }
+    if (isOpen) setActiveTab(initialTab);
   }, [isOpen, initialTab]);
 
+  // Sync with student prop and pof_evaluations
   useEffect(() => {
-    if (student) {
-      setEditForm({
-        phoneNumber: student.phoneNumber || '',
-        sponsorRelationship: student.sponsorRelationship || '',
-        isVerified: student.isVerified || false,
-        topUpFeePercentage: student.topUpPricingConfig?.topUpFeePercentage || 2.5,
-        flatProcessingFeeNgn: student.topUpPricingConfig?.flatProcessingFeeNgn || 5000,
-        maxAllowedTopUpNgn: student.topUpPricingConfig?.maxAllowedTopUpNgn || 15000000
-      });
-      setHasCustomRequirements(student.hasCustomRequirements || false);
-      setCustomRequirements(student.customDocumentRequirements || []);
-    }
-  }, [student]);
+    if (!isOpen || !student) return;
+    const uid = student.userId || student.id;
 
-  // Fetch Global Requirements
-  useEffect(() => {
-    if (!isOpen || activeTab !== 'documents') return;
-    const unsub = onSnapshot(doc(db, 'system_config', 'document_requirements'), (snap) => {
+    // Listen to user doc for up-to-date fields
+    const unsubUser = onSnapshot(doc(db, 'users', uid), (snap) => {
       if (snap.exists()) {
-        setGlobalRequirements(snap.data().globalRequirements || []);
+        const data = snap.data();
+        setEditForm(prev => ({
+          ...prev,
+          phoneNumber: data.phoneNumber || '',
+          sponsorRelationship: data.sponsorRelationship || '',
+          isVerified: data.isApproved || data.isVerified || false,
+          topUpFeePercentage: data.topUpPricingConfig?.topUpFeePercentage || 2.5,
+          flatProcessingFeeNgn: data.topUpPricingConfig?.flatProcessingFeeNgn || 5000,
+          maxAllowedTopUpNgn: data.topUpPricingConfig?.maxAllowedTopUpNgn || 15000000,
+          userName: data.displayName || data.name || ''
+        }));
       }
     });
-    return unsub;
-  }, [isOpen, activeTab]);
 
-  // Fetch Submissions
-  useEffect(() => {
-    if (!isOpen || !student || activeTab !== 'documents') return;
-    const q = query(collection(db, 'users', student.userId || student.id, 'submitted_documents'));
-    const unsub = onSnapshot(q, (snap) => {
-      setSubmissions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
-    return unsub;
-  }, [isOpen, student, activeTab]);
-
-  // Fetch Audit Logs when activeTab is 'activity'
-  useEffect(() => {
-    if (!isOpen || !student || activeTab !== 'activity') return;
-
-    setLoadingLogs(true);
-    const q = query(
-      collection(db, 'audit_logs'),
-      where('studentId', '==', student.userId || student.id),
-      orderBy('createdAt', 'desc'),
-      limit(50)
-    );
-
-    const unsub = onSnapshot(q, (snap) => {
-      setAuditLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setLoadingLogs(false);
-    }, (err) => {
-      console.error("Audit log error:", err);
-      setLoadingLogs(false);
+    // Listen to pof_evaluations
+    const q = query(collection(db, 'pof_evaluations'), where('userId', '==', uid));
+    const unsubEval = onSnapshot(q, (snap) => {
+      if (!snap.empty) {
+        const evalData = snap.docs[0].data();
+        setPofEvaluation({ id: snap.docs[0].id, ...evalData });
+        const start = evalData.startDate ? new Date(evalData.startDate).getTime() : null;
+        const days = start ? Math.min(Math.max(Math.floor((Date.now() - start) / 86400000) + 1, 1), 28) : 0;
+        setEditForm(prev => ({
+          ...prev,
+          targetGBP: evalData.targetGBP || 0,
+          consecutiveDays: days,
+          expirationDate: evalData.expirationDate || '',
+          isTimerActive: evalData.isTimerActive || false,
+          timerCustomMessage: evalData.timerCustomMessage || ''
+        }));
+      }
     });
 
-    return unsub;
+    return () => { unsubUser(); unsubEval(); };
+  }, [isOpen, student]);
+
+  // Fetch Submissions & Logs
+  useEffect(() => {
+    if (!isOpen || !student) return;
+    const uid = student.userId || student.id;
+
+    if (activeTab === 'documents') {
+      const q = query(collection(db, 'users', uid, 'submitted_documents'));
+      return onSnapshot(q, (snap) => setSubmissions(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    }
+
+    if (activeTab === 'activity') {
+      setLoadingLogs(true);
+      const q = query(collection(db, 'audit_logs'), where('studentId', '==', uid), orderBy('createdAt', 'desc'), limit(30));
+      return onSnapshot(q, (snap) => {
+        setAuditLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        setLoadingLogs(false);
+      });
+    }
   }, [isOpen, student, activeTab]);
 
-  if (!isOpen || !student) return null;
-
-  const handleSave = async () => {
+  const handleSaveField = async (field: string, value: any) => {
+    const uid = student.userId || student.id;
     setIsSaving(true);
     try {
-      await updateDoc(doc(db, 'users', student.userId || student.id), {
-        phoneNumber: editForm.phoneNumber,
-        sponsorRelationship: editForm.sponsorRelationship,
-        isVerified: editForm.isVerified,
+      const updates: any = { [field]: value, updatedAt: serverTimestamp() };
+      if (field === 'targetCountry' && !student.targetCurrency) {
+        updates.targetCurrency = resolveCountryCurrency(value);
+      }
+      await updateDoc(doc(db, 'users', uid), updates);
+      toast.success(`${field.toUpperCase()} updated`);
+      setEditingField(null);
+    } catch (e: any) {
+      toast.error('Update failed');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveTopUpSettings = async () => {
+    const uid = student.userId || student.id;
+    setIsSaving(true);
+    try {
+      await updateDoc(doc(db, 'users', uid), {
         topUpPricingConfig: {
           topUpFeePercentage: Number(editForm.topUpFeePercentage),
           flatProcessingFeeNgn: Number(editForm.flatProcessingFeeNgn),
           maxAllowedTopUpNgn: Number(editForm.maxAllowedTopUpNgn),
           updatedAt: new Date()
         },
-        hasCustomRequirements,
-        customDocumentRequirements: customRequirements,
         updatedAt: serverTimestamp()
       });
-      toast.success('Student profile updated successfully');
-      if (onUpdate) onUpdate();
-    } catch (error: any) {
-      toast.error('Failed to update profile: ' + error.message);
+      toast.success('Pricing updated');
+    } catch (e) {
+      toast.error('Failed to update pricing');
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleApprove = async () => {
+  const handleCommitManualAdjustment = async () => {
+    if (!editForm.manualReason.trim()) return toast.error('Audit reason required');
+    const uid = student.userId || student.id;
     setIsSaving(true);
     try {
-      await setDoc(doc(db, 'users', student.userId || student.id), {
-        isApproved: true,
-        setupCompleted: true,
-        onboardingComplete: true,
-        approvedAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      }, { merge: true });
-      toast.success('Student account approved');
-      if (onUpdate) onUpdate();
-    } catch (error: any) {
-      toast.error('Failed to approve student');
+      await addDoc(collection(db, 'financial_accounts'), {
+        userId: uid,
+        userEmail: student.email,
+        bankName: 'Manual Governance Adjustment',
+        accountMask: '••••MANL',
+        balanceNGN: editForm.balanceSubMode === 'deposit' ? editForm.manualAmount : -editForm.manualAmount,
+        balanceGBP: (editForm.balanceSubMode === 'deposit' ? editForm.manualAmount : -editForm.manualAmount) / LIVE_FX_RATE,
+        provider: 'MANUAL_OVERRIDE',
+        status: 'ACTIVE',
+        createdAt: serverTimestamp()
+      });
+      await addDoc(collection(db, 'audit_logs'), {
+        actor: appUser?.displayName || 'Admin',
+        action: 'MANUAL_BALANCE_ADJUSTMENT',
+        detail: `${editForm.balanceSubMode.toUpperCase()} of ₦${editForm.manualAmount.toLocaleString()} for ${editForm.manualReason}`,
+        studentId: uid,
+        createdAt: serverTimestamp()
+      });
+      toast.success('Ledger adjusted');
+      setEditForm(prev => ({ ...prev, manualAmount: 0, manualReason: '' }));
+    } catch (e: any) {
+      toast.error('Adjustment failed');
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleToggleCustom = () => {
-    if (!hasCustomRequirements) {
-      // Cloning global requirements into custom ones
-      setCustomRequirements([...globalRequirements]);
-    }
-    setHasCustomRequirements(!hasCustomRequirements);
-  };
+  if (!isOpen || !student) return null;
 
-  const handleAddCustomRequirement = (req: RequirementItem) => {
-    setCustomRequirements(prev => [...prev, req]);
-  };
+  // Task 2: Data Resolution
+  const origin = student.currentCountry || student.originCountry || 'Nigeria';
+  const destination = student.targetCountry || 'Canada';
+  const currency = student.targetCurrency || resolveCountryCurrency(destination);
 
-  const handleUpdateCustomRequirement = (req: RequirementItem) => {
-    setCustomRequirements(prev => prev.map(item => item.id === req.id ? req : item));
-  };
-
-  const handleDeleteCustomRequirement = (id: string) => {
-    setCustomRequirements(prev => prev.filter(item => item.id !== id));
-  };
-
-  const handleReviewSubmission = async (requirementId: string, status: 'APPROVED' | 'REJECTED', reason: string | null = null) => {
-    try {
-      const subRef = doc(db, 'users', student.userId || student.id, 'submitted_documents', requirementId);
-      await updateDoc(subRef, {
-        status,
-        rejectionReason: reason,
-        reviewedAt: serverTimestamp(),
-        reviewedBy: appUser?.email || 'Admin'
-      });
-      toast.success(`Document marked as ${status}`);
-    } catch (err: any) {
-      toast.error('Review failed: ' + err.message);
-    }
-  };
-
-  return (
-    <AnimatePresence mode="wait">
-      {isOpen && student && (
-        <motion.div
-          variants={modalBackdropVariants}
-          initial="initial"
-          animate="animate"
-          exit="exit"
-          className="fixed inset-0 z-[600] flex justify-end bg-slate-950/40 backdrop-blur-md"
-          onClick={onClose}
-        >
-          <motion.div
-            key={`drawer-${student.userId || student.id}`}
-            variants={drawerVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            className="fixed right-0 top-0 bottom-0 h-screen w-full max-w-[420px] bg-slate-900/60 backdrop-blur-[75px] border-l border-white/15 z-50 flex flex-col overflow-hidden shadow-[-10px_0_30px_rgba(0,0,0,0.5)] rounded-l-3xl transition-colors duration-500"
-            onClick={e => e.stopPropagation()}
-          >
-          {/* Header */}
-          <div className="p-6 border-b border-slate-200 dark:border-white/5 flex justify-between items-center sticky top-0 z-20 backdrop-blur-xl bg-white/80 dark:bg-slate-900/40">
-            <div>
-              <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 dark:text-white">Governance Review</h3>
-              <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mt-0.5">Configuration Mode: {student.name || student.displayName}</p>
+  const renderInlineEdit = (field: string, label: string, currentVal: string) => {
+    const isEditing = editingField === field;
+    return (
+      <div className="space-y-1 py-2">
+        <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block">{label}</span>
+        <div className="flex items-center justify-between group">
+          {isEditing ? (
+            <div className="flex items-center gap-2 flex-1 animate-in fade-in slide-in-from-left-2 duration-300">
+              <input
+                autoFocus
+                className="flex-1 bg-slate-950/60 border border-amber-500/50 rounded-xl px-3 py-2 text-sm font-bold text-white focus:outline-none"
+                defaultValue={currentVal}
+                onChange={(e) => setEditValue(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSaveField(field, editValue || currentVal)}
+              />
+              <button onClick={() => handleSaveField(field, editValue || currentVal)} className="p-2 bg-emerald-600 text-white rounded-lg"><Save className="w-3.5 h-3.5" /></button>
+              <button onClick={() => setEditingField(null)} className="p-2 bg-slate-800 text-slate-400 rounded-lg"><XIcon className="w-3.5 h-3.5" /></button>
             </div>
-            <button onClick={onClose} aria-label="Close governance review" className="p-2.5 rounded-xl bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 dark:text-slate-400 transition-all shadow-sm">
-              <XIcon className="w-5 h-5" />
-            </button>
-          </div>
-
-          {/* Tabs */}
-          <div className="flex px-6 pt-6 gap-2">
-            {[
-              { id: 'profile', label: 'Student Profile', icon: User },
-              { id: 'documents', label: 'Documents', icon: FileText },
-              { id: 'activity', label: 'Activity History', icon: History }
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                  activeTab === tab.id
-                    ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20'
-                    : 'bg-white/5 text-slate-400 hover:bg-white/10'
-                }`}
-              >
-                <tab.icon className="w-3.5 h-3.5" />
-                <span>{tab.label}</span>
-              </button>
-            ))}
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-6 space-y-8 no-scrollbar">
-            {activeTab === 'profile' && (
-              <>
-                {/* Identity Section */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500">
-                      <User className="w-5 h-5" />
-                    </div>
-                    <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">Personal Identity</h4>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-bold text-slate-500 dark:text-slate-500 uppercase">Display Name</p>
-                      <p className="text-sm font-bold text-slate-900 dark:text-white">{student.name || student.displayName}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-bold text-slate-500 dark:text-slate-500 uppercase">Email Address</p>
-                      <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{student.email}</p>
-                    </div>
-                    <div className="space-y-1 col-span-2">
-                      <p className="text-[10px] font-bold text-slate-500 dark:text-slate-500 uppercase">Phone Number</p>
-                      <input
-                        type="text"
-                        value={editForm.phoneNumber}
-                        onChange={e => setEditForm(prev => ({ ...prev, phoneNumber: e.target.value }))}
-                        className="w-full bg-white dark:bg-slate-950/50 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm font-bold text-slate-900 dark:text-white focus:outline-none focus:border-amber-500 transition-colors shadow-sm"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Location & Target */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-500">
-                      <Globe className="w-5 h-5" />
-                    </div>
-                    <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">Route & Target</h4>
-                  </div>
-                  <div className="bg-white/40 dark:bg-white/5 border border-slate-200/60 dark:border-white/10 rounded-3xl p-6 grid grid-cols-2 gap-6 shadow-sm">
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-bold text-slate-600 dark:text-slate-500 uppercase">Origin</p>
-                      <p className="text-sm font-bold text-slate-900 dark:text-white">
-                        {student.homeState || 'N/A'}, {student.homeCountry || 'N/A'}
-                      </p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-bold text-slate-600 dark:text-slate-500 uppercase">Destination</p>
-                      <p className="text-sm font-bold text-slate-900 dark:text-white">{student.destinationCountry || 'N/A'}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-bold text-slate-600 dark:text-slate-500 uppercase">Target Currency</p>
-                      <div className="flex items-center gap-2">
-                        <span className="text-amber-600 dark:text-amber-500 text-lg font-black">{student.targetCurrencySymbol || '£'}</span>
-                        <span className="text-sm font-bold text-slate-900 dark:text-white">{student.targetCurrency || 'GBP'}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Top-Up Pricing Config */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-500">
-                      <Sliders className="w-5 h-5" />
-                    </div>
-                    <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">Top-Up Pricing</h4>
-                  </div>
-                  <div className="bg-white/40 dark:bg-white/5 border border-slate-200/60 dark:border-white/10 rounded-3xl p-6 space-y-6 shadow-sm">
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center px-1">
-                        <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest">Service Fee (%)</label>
-                        <span className="text-sm font-black text-accent-gold dark:text-amber-500">{editForm.topUpFeePercentage}%</span>
-                      </div>
-                      <input
-                        type="range" min="0.5" max="15" step="0.1"
-                        value={editForm.topUpFeePercentage}
-                        onChange={(e) => setEditForm(prev => ({ ...prev, topUpFeePercentage: parseFloat(e.target.value) }))}
-                        className="w-full accent-amber-500 bg-slate-200 dark:bg-slate-800 rounded-lg h-1.5 appearance-none cursor-pointer"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-500 dark:text-slate-500 uppercase tracking-widest ml-1">Flat Admin Fee (₦)</label>
-                        <input
-                          type="number"
-                          value={editForm.flatProcessingFeeNgn}
-                          onChange={(e) => setEditForm(prev => ({ ...prev, flatProcessingFeeNgn: parseInt(e.target.value) }))}
-                          className="w-full bg-white dark:bg-slate-950/50 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-xs font-bold text-slate-900 dark:text-white focus:outline-none focus:border-amber-500 shadow-sm"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-500 dark:text-slate-500 uppercase tracking-widest ml-1">Max Allocation (₦)</label>
-                        <input
-                          type="number"
-                          value={editForm.maxAllowedTopUpNgn}
-                          onChange={(e) => setEditForm(prev => ({ ...prev, maxAllowedTopUpNgn: parseInt(e.target.value) }))}
-                          className="w-full bg-white dark:bg-slate-950/50 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-xs font-bold text-slate-900 dark:text-white focus:outline-none focus:border-amber-500 shadow-sm"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Master Package Dispatch */}
-                {student.compiledPackageUrl && (
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-500">
-                        <Layers className="w-5 h-5" />
-                      </div>
-                      <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">Master Regulatory Package</h4>
-                    </div>
-                    <div className="p-6 rounded-3xl bg-indigo-500/5 border border-indigo-500/20 flex flex-col gap-4">
-                      <p className="text-[10px] font-medium text-slate-400 leading-relaxed uppercase tracking-wider">
-                        A unified 6-page PDF has been compiled for this student including the signed upgrade form and all identity proofs.
-                      </p>
-                      <div className="flex gap-3">
-                        <button
-                          onClick={() => window.open(student.compiledPackageDownloadUrl || student.compiledPackageUrl, '_blank')}
-                          className="flex-1 py-3 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-500/20 active:scale-95 transition-all flex items-center justify-center gap-2"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          Review Package
-                        </button>
-                        <a
-                          href={student.compiledPackageDownloadUrl || student.compiledPackageUrl}
-                          download={`Package_${student.name || 'User'}.pdf`}
-                          className="flex-1 py-3 bg-slate-800 text-white rounded-xl text-[10px] font-black uppercase tracking-widest border border-white/5 flex items-center justify-center gap-2 hover:bg-slate-700 transition-all"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                          Download
-                        </a>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Financial Status */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500">
-                      <CreditCard className="w-5 h-5" />
-                    </div>
-                    <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">Financial Setup</h4>
-                  </div>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-2xl">
-                      <div>
-                        <p className="text-[10px] font-bold text-slate-500 uppercase">Primary Bank</p>
-                        <p className="text-sm font-bold text-white">{student.bankName || 'Not Linked'}</p>
-                      </div>
-                      <button
-                        onClick={() => setEditForm(prev => ({ ...prev, isVerified: !prev.isVerified }))}
-                        className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase transition-all ${
-                          editForm.isVerified
-                            ? 'bg-emerald-500 text-white'
-                            : 'bg-rose-500/20 text-rose-500 border border-rose-500/30'
-                        }`}
-                      >
-                        {editForm.isVerified ? 'VERIFIED' : 'UNVERIFIED'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {activeTab === 'documents' && (
-              <div className="space-y-8 animate-in fade-in duration-300">
-                {/* Inheritance Toggle */}
-                <div className={`p-6 rounded-[2rem] border transition-all ${
-                  hasCustomRequirements ? 'bg-amber-500/5 border-amber-500/20' : 'bg-blue-600/5 border-blue-500/20'
-                }`}>
-                  <div className="flex items-center justify-between mb-4">
-                     <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-xl ${hasCustomRequirements ? 'bg-amber-500/20 text-amber-500' : 'bg-blue-500/20 text-blue-500'}`}>
-                           {hasCustomRequirements ? <Sliders className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
-                        </div>
-                        <div>
-                           <p className={`text-[10px] font-black uppercase tracking-widest ${hasCustomRequirements ? 'text-amber-500' : 'text-blue-500'}`}>
-                             {hasCustomRequirements ? 'Student-Level Overrides Active' : 'Inheriting System Defaults'}
-                           </p>
-                           <p className="text-[8px] font-bold text-slate-500 uppercase mt-0.5">
-                             {hasCustomRequirements ? 'Manual document checklist defined for this user' : 'Synchronized with global master requirement list'}
-                           </p>
-                        </div>
-                     </div>
-                     <button
-                       onClick={handleToggleCustom}
-                       className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-tight transition-all ${
-                         hasCustomRequirements ? 'bg-slate-800 text-slate-300 hover:text-white' : 'bg-blue-600 text-white shadow-lg'
-                       }`}
-                     >
-                       {hasCustomRequirements ? 'Revert to Global' : 'Customize List'}
-                     </button>
-                  </div>
-                </div>
-
-                {/* Requirements Configuration (Only shown if custom) */}
-                {hasCustomRequirements && (
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center px-2">
-                      <h5 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Document Checklist Configuration</h5>
-                      <button
-                        onClick={() => { setEditingRequirement(null); setIsRequirementModalOpen(true); }}
-                        className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-blue-400 hover:text-blue-300 transition-colors"
-                      >
-                        <Plus className="w-3 h-3" /> Add Item
-                      </button>
-                    </div>
-                    <div className="space-y-2">
-                      {customRequirements.map((req, idx) => (
-                        <div key={req.id || `custom-${idx}`} className="p-4 glass-subcard flex items-center justify-between group">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <FileText className="w-4 h-4 text-slate-500 shrink-0" />
-                            <div className="min-w-0">
-                               <p className="text-xs font-bold text-white truncate">{req.label}</p>
-                               <p className="text-[9px] text-slate-500 font-mono uppercase">{req.type} {req.isRequired && '• Mandatory'}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => { setEditingRequirement(req); setIsRequirementModalOpen(true); }} className="p-1.5 hover:bg-white/5 rounded text-blue-400"><Edit3 className="w-3.5 h-3.5" /></button>
-                            <button onClick={() => handleDeleteCustomRequirement(req.id)} className="p-1.5 hover:bg-rose-500/10 rounded text-rose-500"><Trash2 className="w-3.5 h-3.5" /></button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Submissions Review Area */}
-                <div className="space-y-4">
-                  <h5 className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Student Submissions</h5>
-                  {(hasCustomRequirements ? customRequirements : globalRequirements).map((req, idx) => {
-                    const submission = submissions.find(s => s.requirementId === req.id);
-                    return (
-                      <div key={req.id || `req-${idx}`} className={`p-6 rounded-[2rem] border transition-all ${
-                        submission ? (
-                          submission.status === 'APPROVED' ? 'bg-emerald-500/5 border-emerald-500/20' :
-                          submission.status === 'REJECTED' ? 'bg-rose-500/5 border-rose-500/20' :
-                          'bg-blue-600/5 border-blue-500/30 shadow-lg shadow-blue-500/5'
-                        ) : 'bg-white/5 border-white/5 opacity-60'
-                      }`}>
-                        <div className="flex items-start justify-between mb-4">
-                          <div>
-                            <p className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1">{req.type}</p>
-                            <h6 className="text-sm font-black text-white uppercase tracking-tight leading-none">{req.label}</h6>
-                          </div>
-                          {submission ? (
-                            <span className={`px-2 py-0.5 rounded-full text-[7px] font-black uppercase ${
-                              submission.status === 'APPROVED' ? 'bg-emerald-500 text-white' :
-                              submission.status === 'REJECTED' ? 'bg-rose-500 text-white' :
-                              'bg-blue-600 text-white animate-pulse'
-                            }`}>
-                              {submission.status.replace('_', ' ')}
-                            </span>
-                          ) : (
-                            <span className="text-[7px] font-black text-slate-600 uppercase">Awaiting Submission</span>
-                          )}
-                        </div>
-
-                        {submission && (
-                          <div className="space-y-4">
-                            {req.type === 'TEXT' ? (
-                              <div className="p-4 rounded-2xl bg-slate-950/40 border border-white/5 text-xs text-slate-300 font-medium leading-relaxed italic">
-                                "{submission.value}"
-                              </div>
-                            ) : (
-                              <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-950/40 border border-white/5">
-                                <div className="flex items-center gap-3">
-                                   <div className="w-10 h-10 rounded-xl bg-blue-600/20 flex items-center justify-center text-blue-400">
-                                      {req.type === 'IMAGE' ? <Activity className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
-                                   </div>
-                                   <div>
-                                      <p className="text-[10px] font-bold text-white uppercase">Binary Payload</p>
-                                      <p className="text-[8px] text-slate-500 font-mono uppercase">{submission.fileType || 'File Node'}</p>
-                                   </div>
-                                </div>
-                                <a
-                                  href={submission.value}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="p-2.5 rounded-xl bg-white/5 hover:bg-blue-600 text-white transition-all shadow-lg"
-                                >
-                                  <Download className="w-4 h-4" />
-                                </a>
-                              </div>
-                            )}
-
-                            {submission.status === 'PENDING_REVIEW' && (
-                              <div className="grid grid-cols-2 gap-3 pt-2">
-                                <button
-                                  onClick={() => handleReviewSubmission(req.id, 'APPROVED')}
-                                  className="py-3 bg-emerald-600 text-white rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg shadow-emerald-500/20 transition-all active:scale-95"
-                                >
-                                  Verify & Approve
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    const reason = window.prompt("Reason for rejection:");
-                                    if (reason) handleReviewSubmission(req.id, 'REJECTED', reason);
-                                  }}
-                                  className="py-3 bg-rose-600 text-white rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg shadow-rose-500/20 transition-all active:scale-95"
-                                >
-                                  Reject Document
-                                </button>
-                              </div>
-                            )}
-
-                            {submission.status === 'REJECTED' && submission.rejectionReason && (
-                              <div className="flex items-center gap-2 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400">
-                                 <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                                 <p className="text-[9px] font-bold uppercase truncate">Reason: {submission.rejectionReason}</p>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'activity' && (
-              <div className="space-y-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-500">
-                    <Activity className="w-5 h-5" />
-                  </div>
-                  <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">Audit Trail</h4>
-                </div>
-
-                {loadingLogs ? (
-                  <div className="py-20 flex flex-col items-center justify-center gap-4">
-                    <Loader2 className="w-8 h-8 animate-spin text-amber-500" />
-                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Loading History...</p>
-                  </div>
-                ) : auditLogs.length === 0 ? (
-                  <div className="py-20 text-center opacity-30 flex flex-col items-center gap-4">
-                    <History className="w-12 h-12" />
-                    <p className="text-[10px] font-black uppercase tracking-[0.3em]">No Activity Logged</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {auditLogs.map((log, idx) => {
-                      const isHighlighted = highlightEventId && log.id === highlightEventId;
-                      return (
-                        <div
-                          key={log.id || `log-${idx}`}
-                          className={`p-5 rounded-3xl border transition-all relative overflow-hidden ${
-                            isHighlighted
-                              ? 'bg-amber-500/10 border-amber-500/50 shadow-lg shadow-amber-500/5 ring-1 ring-amber-500/30'
-                              : 'bg-white/5 border-white/5 hover:border-white/10'
-                          }`}
-                        >
-                          {isHighlighted && (
-                            <div className="absolute top-0 right-0 p-2">
-                              <Zap className="w-3 h-3 text-amber-500 animate-pulse" />
-                            </div>
-                          )}
-                          <div className="flex justify-between items-start mb-2">
-                            <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">{log.action || 'Event'}</span>
-                            <span className="text-[9px] font-mono text-slate-500 uppercase">
-                              {log.createdAt?.seconds ? new Date(log.createdAt.seconds * 1000).toLocaleString() : 'Now'}
-                            </span>
-                          </div>
-                          <p className="text-xs font-medium text-slate-200 leading-relaxed">{log.detail || log.message}</p>
-                          <div className="mt-3 flex items-center gap-2">
-                            <div className="w-4 h-4 rounded-full bg-slate-800 flex items-center justify-center">
-                              <User className="w-2 h-2 text-slate-500" />
-                            </div>
-                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-tighter">Actor: {log.actor || 'System'}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Footer Actions */}
-          <div className="p-8 border-t border-white/5 space-y-3 sticky bottom-0 z-20 backdrop-blur-xl bg-slate-900/80">
-            <div className="flex gap-3">
-              <button
-                onClick={handleSave}
-                disabled={isSaving}
-                className="flex-1 py-4 rounded-2xl bg-white text-slate-950 hover:bg-slate-100 text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
-              >
-                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                Save Changes
-              </button>
-              {!student.isApproved && (
-                <BouncyButton
-                  onClick={handleApprove}
-                  disabled={isSaving}
-                  className="flex-1 py-4 rounded-2xl bg-emerald-500 text-white text-xs font-black uppercase tracking-widest hover:bg-emerald-400 shadow-xl shadow-emerald-500/20 transition-all flex items-center justify-center gap-2"
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  Approve Access
-                </BouncyButton>
-              )}
-            </div>
-            <BouncyButton className="w-full py-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs font-black uppercase tracking-widest hover:bg-rose-500/20 transition-all flex items-center justify-center gap-2">
-              <Flag className="w-4 h-4" />
-              Flag Low Funds
-            </BouncyButton>
-          </div>
-        </motion.div>
-        </motion.div>
-      )}
-    <RequirementItemModal
-        isOpen={isRequirementModalOpen}
-        onClose={() => setIsRequirementModalOpen(false)}
-        requirement={editingRequirement}
-        onSave={(req) => {
-          if (editingRequirement) handleUpdateCustomRequirement(req);
-          else handleAddCustomRequirement(req);
-          setIsRequirementModalOpen(false);
-        }}
-      />
-    </AnimatePresence>
-  );
-};
-
-const RequirementItemModal: React.FC<{
-  isOpen: boolean;
-  onClose: () => void;
-  requirement: RequirementItem | null;
-  onSave: (req: RequirementItem) => void;
-}> = ({ isOpen, onClose, requirement, onSave }) => {
-  const [form, setForm] = useState<RequirementItem>({
-    id: '',
-    label: '',
-    type: 'PDF',
-    description: '',
-    isRequired: true,
-    templateUrl: ''
-  });
-
-  useEffect(() => {
-    if (requirement) setForm({ ...requirement, templateUrl: requirement.templateUrl || '' });
-    else setForm({ id: Math.random().toString(36).substr(2, 9), label: '', type: 'PDF', description: '', isRequired: true, templateUrl: '' });
-  }, [requirement, isOpen]);
-
-  if (!isOpen) return null;
+          ) : (
+            <>
+              <p className="text-sm font-bold text-white uppercase">{currentVal || 'N/A'}</p>
+              <button onClick={() => { setEditValue(currentVal); setEditingField(field); }} className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-500 hover:text-amber-500 transition-all"><Edit3 className="w-3.5 h-3.5" /></button>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          variants={modalBackdropVariants}
-          initial="initial"
-          animate="animate"
-          exit="exit"
-          className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md"
+          variants={modalBackdropVariants} initial="initial" animate="animate" exit="exit"
+          className="fixed inset-0 z-[600] flex justify-end bg-slate-950/40 backdrop-blur-md"
           onClick={onClose}
         >
           <motion.div
-            variants={modalBoxVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            className="glass-card w-full max-w-md flex flex-col shadow-[0_20px_50px_rgba(0,0,0,0.5)]"
+            variants={drawerVariants} initial="initial" animate="animate" exit="exit"
+            className="fixed right-0 top-0 bottom-0 h-screen w-full max-w-[420px] bg-zinc-900/90 backdrop-blur-[75px] border-l border-zinc-800 z-50 flex flex-col overflow-hidden rounded-l-3xl shadow-none"
             onClick={e => e.stopPropagation()}
           >
-            <div className="p-8 border-b border-white/5 flex justify-between items-center bg-slate-950/20">
+            {/* Header */}
+            <div className="p-6 border-b border-slate-200 dark:border-zinc-800 flex justify-between items-center sticky top-0 z-20 backdrop-blur-xl bg-slate-900/40">
               <div>
-                <h3 className="text-xl font-black text-white uppercase tracking-tight">{requirement ? 'Edit' : 'Add'} Custom Requirement</h3>
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Configure student-specific check item</p>
+                <h3 className="text-xl font-black uppercase tracking-tight text-white">Governance Review</h3>
+                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mt-0.5">Config: {student.name}</p>
               </div>
-              <BouncyButton onClick={onClose} className="p-2 hover:bg-slate-800 rounded-xl transition-colors text-slate-500"><XIcon className="w-6 h-6" /></BouncyButton>
+              <button onClick={onClose} className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 transition-all"><XIcon className="w-5 h-5" /></button>
             </div>
-            <div className="p-8 space-y-6">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Field Label</label>
-                  <input
-                    value={form.label}
-                    onChange={e => setForm({...form, label: e.target.value})}
-                    placeholder="e.g. Sponsor Bank Statement"
-                    className="w-full bg-slate-950 border border-white/10 rounded-2xl px-5 py-4 text-xs font-bold text-white focus:outline-none focus:border-blue-500 transition-all"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Input Type</label>
-                  <select
-                    value={form.type}
-                    onChange={e => setForm({...form, type: e.target.value as any})}
-                    className="w-full bg-slate-950 border border-white/10 rounded-2xl px-5 py-4 text-xs font-bold text-white focus:outline-none"
-                  >
-                    <option value="TEXT">Text Input / Response</option>
-                    <option value="IMAGE">Image (.jpg, .png)</option>
-                    <option value="DOC">Word Document (.doc, .docx)</option>
-                    <option value="PDF">PDF File (.pdf)</option>
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Instruction / Description</label>
-                  <textarea
-                    value={form.description}
-                    onChange={e => setForm({...form, description: e.target.value})}
-                    placeholder="Instructions for the student..."
-                    rows={3}
-                    className="w-full bg-slate-950 border border-white/10 rounded-2xl px-5 py-4 text-xs font-bold text-white focus:outline-none focus:border-blue-500 transition-all resize-none"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Template Download URL (Optional)</label>
-                  <input
-                    value={form.templateUrl}
-                    onChange={e => setForm({...form, templateUrl: e.target.value})}
-                    placeholder="e.g. /downloads/template.pdf"
-                    className="w-full bg-slate-950 border border-white/10 rounded-2xl px-5 py-4 text-xs font-bold text-white focus:outline-none focus:border-blue-500 transition-all"
-                  />
-                </div>
-                <div className="flex items-center justify-between p-4 glass-subcard">
-                  <div>
-                    <p className="text-[10px] font-black text-white uppercase tracking-widest">Mandatory Requirement</p>
-                    <p className="text-[8px] text-slate-500 uppercase font-bold mt-0.5">Blocking if not submitted</p>
+
+            {/* Tabs */}
+            <div className="flex px-6 pt-6 gap-2 flex-wrap shrink-0">
+              {[
+                { id: 'profile', label: 'Profile', icon: User },
+                { id: 'governance', label: 'Governance', icon: Settings },
+                { id: 'documents', label: 'Docs', icon: FileText },
+                { id: 'activity', label: 'Logs', icon: History }
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                    activeTab === tab.id ? 'bg-amber-500 text-slate-950 shadow-lg' : 'bg-white/5 text-slate-400 hover:bg-white/10 border border-slate-200 dark:border-zinc-800'
+                  }`}
+                >
+                  <tab.icon className="w-3.5 h-3.5" />
+                  <span>{tab.label}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-8 no-scrollbar">
+              {activeTab === 'profile' && (
+                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3"><div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-slate-200 dark:border-zinc-800 flex items-center justify-center text-amber-500"><User className="w-4 h-4" /></div><h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Personal Identity</h4></div>
+                    <div className="bg-white/5 border border-slate-200 dark:border-zinc-800 rounded-[2rem] p-6 space-y-1">
+                      {renderInlineEdit('displayName', 'Display Name', student.displayName || student.name)}
+                      {renderInlineEdit('email', 'Email Address', student.email)}
+                      {renderInlineEdit('phoneNumber', 'Phone Number', student.phoneNumber)}
+                    </div>
                   </div>
-                  <BouncyButton
-                    onClick={() => setForm({...form, isRequired: !form.isRequired})}
-                    className={`w-12 h-6 rounded-full transition-all relative ${form.isRequired ? 'bg-emerald-500' : 'bg-slate-800'}`}
-                  >
-                    <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-md ${form.isRequired ? 'left-7' : 'left-1'}`} />
-                  </BouncyButton>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3"><div className="w-8 h-8 rounded-xl bg-blue-500/10 border border-slate-200 dark:border-zinc-800 flex items-center justify-center text-blue-500"><Globe className="w-4 h-4" /></div><h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Route & Target</h4></div>
+                    <div className="bg-white/5 border border-slate-200 dark:border-zinc-800 rounded-[2rem] p-6 space-y-1">
+                      {renderInlineEdit('currentCountry', 'Origin', origin)}
+                      {renderInlineEdit('targetCountry', 'Destination', destination)}
+                      {renderInlineEdit('targetCurrency', 'Currency', currency)}
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3"><div className="w-8 h-8 rounded-xl bg-purple-500/10 border border-slate-200 dark:border-zinc-800 flex items-center justify-center text-purple-500"><Sliders className="w-4 h-4" /></div><h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Top-Up Pricing</h4></div>
+                    <div className="bg-white/5 border border-slate-200 dark:border-zinc-800 rounded-[2rem] p-6 space-y-6">
+                       <div className="flex justify-between items-center"><label className="text-[9px] font-black text-slate-400 uppercase">Service Fee</label><span className="text-sm font-black text-amber-500">{editForm.topUpFeePercentage}%</span></div>
+                       <input type="range" min="0.5" max="15" step="0.1" value={editForm.topUpFeePercentage} onChange={e => setEditForm(prev => ({...prev, topUpFeePercentage: parseFloat(e.target.value)}))} className="w-full accent-amber-500 bg-slate-800 rounded-lg h-1.5 appearance-none cursor-pointer" />
+                       <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-1"><label className="text-[9px] font-bold text-slate-500 uppercase ml-1">Flat Fee (₦)</label><input type="number" value={editForm.flatProcessingFeeNgn} onChange={e => setEditForm(prev => ({...prev, flatProcessingFeeNgn: parseInt(e.target.value)}))} className="w-full bg-slate-950 border border-slate-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-xs text-white" /></div>
+                          <div className="space-y-1"><label className="text-[9px] font-bold text-slate-500 uppercase ml-1">Limit (₦)</label><input type="number" value={editForm.maxAllowedTopUpNgn} onChange={e => setEditForm(prev => ({...prev, maxAllowedTopUpNgn: parseInt(e.target.value)}))} className="w-full bg-slate-950 border border-slate-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-xs text-white" /></div>
+                       </div>
+                       <button onClick={handleSaveTopUpSettings} disabled={isSaving} className="w-full py-3 bg-white text-slate-950 rounded-xl text-[10px] font-black uppercase shadow-lg flex items-center justify-center gap-2">{isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} Save Pricing</button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <BouncyButton
-                onClick={() => onSave(form)}
-                disabled={!form.label}
-                className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl shadow-blue-500/20 transition-all disabled:opacity-50"
-              >
-                {requirement ? 'Commit Requirement Change' : 'Incorporate into Custom List'}
-              </BouncyButton>
+              )}
+
+              {activeTab === 'governance' && (
+                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3"><div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-slate-200 dark:border-zinc-800 flex items-center justify-center text-amber-500"><TrendingUp className="w-4 h-4" /></div><h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Balance Adjustments</h4></div>
+                    <div className="bg-white/5 border border-slate-200 dark:border-zinc-800 rounded-[2rem] p-6 space-y-4">
+                      <div className="flex p-1 bg-slate-950 rounded-xl border border-slate-200 dark:border-zinc-800">
+                        {['deposit', 'deduct'].map(m => (
+                          <button key={m} onClick={() => setEditForm({...editForm, balanceSubMode: m as any})} className={`flex-1 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${editForm.balanceSubMode === m ? 'bg-amber-500 text-slate-950' : 'text-slate-500'}`}>{m}</button>
+                        ))}
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">Amount (₦)</label>
+                        <input type="number" value={editForm.manualAmount} onChange={e => setEditForm({...editForm, manualAmount: parseFloat(e.target.value) || 0})} className="w-full bg-slate-950 border border-slate-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm font-bold text-white" />
+                      </div>
+                      <textarea placeholder="Audit reason..." value={editForm.manualReason} onChange={e => setEditForm({...editForm, manualReason: e.target.value})} className="w-full bg-slate-950 border border-slate-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-xs text-white h-24 resize-none" />
+                      <button onClick={handleCommitManualAdjustment} disabled={isSaving || !editForm.manualReason.trim()} className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg flex items-center justify-center gap-2">{isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />} Commit Adjustment</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'documents' && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2"><FileText className="w-4 h-4" /> Checklist Compliance</h4>
+                  <div className="space-y-3">
+                    {submissions.map(sub => (
+                      <div key={sub.id} className="p-4 rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white/5 flex items-center justify-between group">
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-white truncate">{sub.requirementLabel}</p>
+                          <p className={`text-[8px] font-black uppercase mt-1 ${sub.status === 'APPROVED' ? 'text-emerald-500' : 'text-amber-500'}`}>{sub.status}</p>
+                        </div>
+                        <button onClick={() => window.open(sub.fileUrl, '_blank')} className="p-2 text-slate-400 hover:text-white transition-all"><ExternalLink className="w-4 h-4" /></button>
+                      </div>
+                    ))}
+                    {submissions.length === 0 && <div className="py-12 text-center border border-dashed border-slate-200 dark:border-zinc-800 rounded-[2rem] opacity-30 text-[10px] font-black uppercase tracking-widest">No documents found</div>}
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'activity' && (
+                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                   {loadingLogs ? <div className="py-20 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-amber-500" /></div> : auditLogs.map(log => (
+                     <div key={log.id} className="p-4 rounded-2xl bg-white/5 border border-slate-200 dark:border-zinc-800 space-y-2">
+                        <div className="flex justify-between items-center"><span className="text-[9px] font-black text-amber-500 uppercase tracking-widest">{log.action?.replace(/_/g, ' ')}</span><span className="text-[8px] font-mono text-slate-600">{new Date(log.createdAt?.seconds * 1000).toLocaleDateString()}</span></div>
+                        <p className="text-[11px] text-slate-300 leading-relaxed font-medium">{log.detail || log.message}</p>
+                        <p className="text-[8px] text-slate-500 uppercase font-black">Actor: {log.actor || 'System'}</p>
+                     </div>
+                   ))}
+                   {auditLogs.length === 0 && !loadingLogs && <div className="py-12 text-center opacity-30 text-[10px] font-black uppercase tracking-widest">Empty Audit Stream</div>}
+                </div>
+              )}
+            </div>
+
+            <div className="p-8 border-t border-slate-200 dark:border-zinc-800 bg-slate-950/40 shrink-0 flex justify-end">
+              <button onClick={onClose} className="px-8 py-3 rounded-xl bg-white/5 border border-slate-200 dark:border-zinc-800 text-slate-400 font-black text-[10px] uppercase tracking-widest hover:text-white transition-all">Close Viewer</button>
             </div>
           </motion.div>
         </motion.div>
       )}
     </AnimatePresence>
   );
+};
+
+const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
+  const styles: any = {
+    CLEARED: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
+    PENDING: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
+    AT_RISK: 'bg-rose-500/10 text-rose-500 border-rose-500/20',
+  };
+  return <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase border ${styles[status] || styles.PENDING}`}>{status || 'PENDING'}</span>;
 };

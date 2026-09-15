@@ -386,10 +386,10 @@ export const StorageExplorer: React.FC = () => {
       <StorageUsageBar onSyncRequest={syncStorageMetrics} />
 
       <div className={`rounded-3xl border shadow-2xl overflow-hidden ${
-        isDark ? 'bg-[#0D111A] border-white/5' : 'bg-white border-slate-200'
+        isDark ? 'bg-[#0D111A] border-slate-200 dark:border-zinc-800' : 'bg-white border-slate-200'
       }`}>
         {/* Header / Toolbar */}
-        <div className={`p-6 border-b flex items-center justify-between gap-4 ${isDark ? 'border-white/5' : 'border-slate-100'}`}>
+        <div className={`p-6 border-b flex items-center justify-between gap-4 ${isDark ? 'dark:border-zinc-800' : 'border-slate-100'}`}>
           <div className="flex items-center gap-4 flex-1">
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? 'bg-white/5 text-slate-400' : 'bg-slate-50 text-slate-500'}`}>
               <HardDrive className="w-5 h-5" />
@@ -586,7 +586,7 @@ export const StorageExplorer: React.FC = () => {
                     <th className="px-6 py-4 w-10"></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/5">
+                <tbody className="divide-y divide-zinc-800">
                   {currentPrefix !== '' && (
                     <tr onClick={handleBack} className="hover:bg-white/5 cursor-pointer group transition-colors">
                       <td className="px-6 py-4"></td>
@@ -819,7 +819,7 @@ export const StorageExplorer: React.FC = () => {
 
           {!loading && items.folders.length === 0 && items.files.length === 0 && (
             <div className="py-20 flex flex-col items-center justify-center text-center">
-               <div className="w-20 h-20 rounded-3xl bg-white/5 border border-white/5 flex items-center justify-center text-slate-700 mb-4">
+               <div className="w-20 h-20 rounded-3xl bg-white/5 border border-slate-200 dark:border-zinc-800 flex items-center justify-center text-slate-700 mb-4">
                  <Folder className="w-10 h-10" />
                </div>
                <h4 className="text-sm font-black uppercase text-slate-600 tracking-widest">Directory Empty</h4>
@@ -846,10 +846,10 @@ export const StorageExplorer: React.FC = () => {
               exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
               className={`fixed top-0 right-0 bottom-0 w-full max-w-xl z-[1200] shadow-2xl border-l flex flex-col ${
-                isDark ? 'bg-[#0D111A] border-white/5' : 'bg-white border-slate-200'
+                isDark ? 'bg-[#0D111A] border-slate-200 dark:border-zinc-800' : 'bg-white border-slate-200'
               }`}
             >
-              <div className="p-6 border-b border-white/5 flex items-center justify-between">
+              <div className="p-6 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                    <div className="w-10 h-10 rounded-xl bg-blue-600/10 flex items-center justify-center text-blue-500">
                      {previewItem.isImage ? <ImageIcon className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
@@ -873,7 +873,7 @@ export const StorageExplorer: React.FC = () => {
                 ) : previewUrl ? (
                   previewItem.isImage ? (
                     <div className="relative group">
-                       <img src={previewUrl} alt={previewItem.name} className="max-w-full max-h-[60vh] rounded-2xl shadow-2xl border border-white/10" />
+                       <img src={previewUrl} alt={previewItem.name} className="max-w-full max-h-[60vh] rounded-2xl shadow-2xl border border-slate-200 dark:border-zinc-800" />
                        <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-2xl backdrop-blur-[2px]">
                           <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="px-6 py-3 bg-white text-slate-950 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl flex items-center gap-2">
                              <ExternalLink className="w-4 h-4" />
@@ -883,7 +883,7 @@ export const StorageExplorer: React.FC = () => {
                     </div>
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center space-y-6">
-                       <div className="w-32 h-32 rounded-[2.5rem] bg-slate-800 flex items-center justify-center text-slate-600 shadow-2xl border border-white/5">
+                       <div className="w-32 h-32 rounded-[2.5rem] bg-slate-800 flex items-center justify-center text-slate-600 shadow-2xl border border-slate-200 dark:border-zinc-800">
                          <FileText className="w-16 h-16" />
                        </div>
                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Document Preview Not Available</p>
@@ -904,7 +904,7 @@ export const StorageExplorer: React.FC = () => {
                 )}
               </div>
 
-              <div className="p-8 border-t border-white/5 bg-slate-900/20">
+              <div className="p-8 border-t border-slate-200 dark:border-zinc-800 bg-slate-900/20">
                 <div className="grid grid-cols-2 gap-4">
                    <div className="space-y-1">
                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Storage Path</p>

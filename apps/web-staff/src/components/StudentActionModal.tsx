@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   X as XIcon,
-  Settings2,
+  Settings,
   Trash2,
   CheckCircle2,
   TrendingUp,
@@ -145,7 +145,7 @@ export const StudentActionModal: React.FC<StudentActionModalProps> = ({
               onClick={() => setMode('edit')}
               className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${mode === 'edit' ? 'bg-amber-500 text-slate-950' : 'text-slate-500 hover:text-slate-300'}`}
             >
-              <Settings2 className="w-3.5 h-3.5" /> Edit Parameters
+              <Settings className="w-3.5 h-3.5" /> Edit Parameters
             </button>
             <button
               onClick={() => setMode('delete')}

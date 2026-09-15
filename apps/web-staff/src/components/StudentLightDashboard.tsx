@@ -39,7 +39,7 @@ import {
   CheckSquare,
   Square,
   ArrowRight,
-  Settings2,
+  Settings,
   Phone,
   ShieldAlert,
   FileText,
@@ -56,10 +56,12 @@ import { StudentProfileModal } from './StudentProfileModal';
 import { StudentDocumentUploadWizard } from './StudentDocumentUploadWizard';
 import { ApprovedTopUpCard } from './ApprovedTopUpCard';
 import { useUserBalance } from '../hooks/useUserBalance';
-import { SmsIngestionService } from '../services/SmsIngestionService';
+import { useAccountProcessor, LinkedBankAccount, AccountType } from '../hooks/useAccountProcessor';
+import { useAndroidBridge } from '../hooks/useAndroidBridge';
+import { GlassModal } from './ui/GlassModal';
 import { toast } from 'sonner';
 
-import { MAJOR_CURRENCIES } from '../constants';
+import { MAJOR_CURRENCIES, LIVE_FX_RATE } from '../constants';
 
 // --- Types ---
 
@@ -92,8 +94,6 @@ interface LinkedBankAccount {
   verificationStatus?: string;
 }
 
-const LIVE_FX_RATE = 1945.50;
-
 const NIGERIAN_BANKS = [
   "Access Bank", "Zenith Bank", "Guaranty Trust Bank (GTB)", "United Bank for Africa (UBA)",
   "First Bank of Nigeria", "Fidelity Bank", "First City Monument Bank (FCMB)", "Stanbic IBTC Bank",
@@ -118,8 +118,28 @@ export const StudentLightDashboard: React.FC<{
 
   const { balance: liveBalance, accounts: liveAccounts, evaluation: liveEvaluation, loading: balanceLoading } = useUserBalance(activeUserId);
 
+  const { isNativeAndroid, triggerSmsSync } = useAndroidBridge({
+    onSuccess: (balance, mask) => {
+      toast.success(`Balance synced: ₦${balance.toLocaleString()} for Acct ${mask}`);
+      setSyncingId(null);
+    },
+    onFailure: (mask, reason) => {
+      toast.error(`Sync failed for ${mask}: ${reason}`);
+      setSyncingId(null);
+    }
+  });
+
   // State
   const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
+
+  const { accounts, totals } = useAccountProcessor({
+    liveAccounts,
+    appUser,
+    liveBalance,
+    activeUserId,
+    selectedAccountIds
+  });
+
   const [evaluation, setEvaluation] = useState<any>(null);
 
   useEffect(() => {
@@ -132,136 +152,6 @@ export const StudentLightDashboard: React.FC<{
       setSelectedAccountIds(liveAccounts.map(a => a.id));
     }
   }, [liveAccounts, selectedAccountIds]);
-
-  // Use liveAccounts as primary data source, splitting personal balance and top-up into two separate cards
-  const accounts = useMemo(() => {
-    const list: LinkedBankAccount[] = [];
-
-    // Check if a dedicated top-up card already exists in liveAccounts
-    const hasDedicatedTopUp = liveAccounts.some(
-      a => a.id.startsWith('TOPUP_') || a.accountType === 'SPONSORED' || a.connectionMethod === 'TOP_UP'
-    );
-
-    const profileApprovedTopUp = Number(userProfile?.raw?.approvedCapitalNgn || userProfile?.raw?.topUpAmountNgn || 0);
-    const consolidatedNgn = Number(liveBalance.consolidatedBalanceNgn || userProfile?.raw?.consolidatedBalanceNgn || 0);
-
-    for (const item of liveAccounts) {
-      const isTopUpDoc = item.id.startsWith('TOPUP_') || item.accountType === 'SPONSORED' || item.connectionMethod === 'TOP_UP';
-      const rawBalNgn = Number(item.accountBalanceNgn ?? item.balanceNgn ?? item.balanceNGN ?? 0);
-      const topUpCapitalNgn = Number(item.orgTopUpCapitalNgn || 0);
-
-      if (!hasDedicatedTopUp && topUpCapitalNgn > 0 && !isTopUpDoc) {
-        const actualBal = Math.max(rawBalNgn - topUpCapitalNgn, 0);
-        list.push({
-          id: item.id,
-          bankName: item.bankName || 'United Bank for Africa (UBA)',
-          accountName: item.accountName || item.bankName || 'Primary Checking / Savings',
-          accountNumberMasked: item.accountNumberMasked || item.accountMask || '•••• 9543',
-          accountType: item.accountType || item.type || 'SAVINGS',
-          balanceNgn: actualBal,
-          balanceGbp: Math.round((actualBal / LIVE_FX_RATE) * 100) / 100,
-          orgTopUpCapitalNgn: 0,
-          isCapitalBreached: false,
-          isVerified: item.isVerified ?? true,
-          isDedicatedParallex: item.isDedicatedParallex || item.bankName?.includes('Parallex'),
-          lastTransactionAt: item.lastTransactionAt || (item.lastSyncedAt?.seconds ? new Date(item.lastSyncedAt.seconds * 1000).toISOString() : null),
-          isSystemTopUp: false,
-          unlinkStatus: item.unlinkStatus || 'ACTIVE',
-          connectionMethod: item.connectionMethod || item.provider || 'MANUAL_DEPOSIT',
-          lastSyncedAt: item.lastSyncedAt?.seconds
-            ? new Date(item.lastSyncedAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            : 'Just now',
-          status: item.status || 'VERIFIED'
-        });
-
-        list.push({
-          id: `TOPUP_${item.id}`,
-          bankName: 'Organization Top-Up Capital',
-          accountName: 'Basechan Sponsored Capital',
-          accountNumberMasked: '•••• TOPUP',
-          accountType: 'SPONSORED' as any,
-          balanceNgn: topUpCapitalNgn,
-          balanceGbp: Math.round((topUpCapitalNgn / LIVE_FX_RATE) * 100) / 100,
-          orgTopUpCapitalNgn: topUpCapitalNgn,
-          isCapitalBreached: false,
-          isVerified: true,
-          isDedicatedParallex: false,
-          lastTransactionAt: item.lastTransactionAt || new Date().toISOString(),
-          isSystemTopUp: false,
-          unlinkStatus: 'ACTIVE',
-          connectionMethod: 'TOP_UP' as any,
-          lastSyncedAt: 'Just now',
-          status: 'VERIFIED'
-        });
-      } else {
-        const isThisTopUp = isTopUpDoc;
-        const balGbp = item.balanceGbp || item.balanceGBP || Math.round((rawBalNgn / LIVE_FX_RATE) * 100) / 100;
-
-        list.push({
-          id: item.id,
-          bankName: isThisTopUp ? (item.bankName || 'Organization Top-Up Capital') : (item.bankName || 'Unknown Bank'),
-          accountName: item.accountName || item.bankName || (isThisTopUp ? 'Basechan Sponsored Capital' : 'Primary Account'),
-          accountNumberMasked: item.accountNumberMasked || item.accountMask || (isThisTopUp ? '•••• TOPUP' : '•••• ****'),
-          accountType: isThisTopUp ? 'SPONSORED' as any : (item.accountType || item.type || 'SAVINGS'),
-          balanceNgn: rawBalNgn,
-          balanceGbp: balGbp,
-          orgTopUpCapitalNgn: isThisTopUp ? rawBalNgn : 0,
-          isCapitalBreached: false,
-          isVerified: item.isVerified ?? true,
-          isDedicatedParallex: item.isDedicatedParallex || item.bankName?.includes('Parallex'),
-          lastTransactionAt: item.lastTransactionAt || (item.lastSyncedAt?.seconds ? new Date(item.lastSyncedAt.seconds * 1000).toISOString() : null),
-          isSystemTopUp: false,
-          unlinkStatus: item.unlinkStatus || 'ACTIVE',
-          connectionMethod: item.connectionMethod || item.provider || (isThisTopUp ? 'TOP_UP' as any : 'MANUAL_DEPOSIT'),
-          lastSyncedAt: item.lastSyncedAt?.seconds
-            ? new Date(item.lastSyncedAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            : 'Just now',
-          status: item.status || 'VERIFIED'
-        });
-      }
-    }
-
-    const currentTopUpExists = list.some(a => a.accountType === 'SPONSORED' || a.id.startsWith('TOPUP_') || a.connectionMethod === 'TOP_UP');
-    if (!currentTopUpExists) {
-      const totalPersonalNgn = list.reduce((sum, a) => sum + (Number(a.balanceNgn) || 0), 0);
-      const topUpAmount = profileApprovedTopUp > 0
-        ? profileApprovedTopUp
-        : (consolidatedNgn > totalPersonalNgn ? consolidatedNgn - totalPersonalNgn : 0);
-
-      if (topUpAmount > 0) {
-        list.push({
-          id: `TOPUP_${studentId}`,
-          bankName: 'Organization Top-Up Capital',
-          accountName: 'Basechan Sponsored Capital',
-          accountNumberMasked: '•••• TOPUP',
-          accountType: 'SPONSORED' as any,
-          balanceNgn: topUpAmount,
-          balanceGbp: Math.round((topUpAmount / LIVE_FX_RATE) * 100) / 100,
-          orgTopUpCapitalNgn: topUpAmount,
-          isCapitalBreached: false,
-          isVerified: true,
-          isDedicatedParallex: false,
-          lastTransactionAt: new Date().toISOString(),
-          isSystemTopUp: false,
-          unlinkStatus: 'ACTIVE',
-          connectionMethod: 'TOP_UP' as any,
-          lastSyncedAt: 'Just now',
-          status: 'VERIFIED'
-        });
-      }
-    }
-
-    return list;
-  }, [liveAccounts, userProfile, liveBalance, studentId]);
-
-  // High-level totals
-  const totals = useMemo(() => {
-    const selectedAccounts = accounts.filter(a => selectedAccountIds.includes(a.id));
-    const accountsNgn = selectedAccounts.reduce((sum, acc) => sum + (Number(acc.balanceNgn) || 0), 0);
-    const ngn = selectedAccountIds.length > 0 ? accountsNgn : (accounts.length === 0 ? (liveBalance.consolidatedBalanceNgn || 0) : 0);
-    const gbp = ngn > 0 ? (ngn / LIVE_FX_RATE) : (liveBalance.gbpEquivalent || 0);
-    return { ngn, gbp, accountsNgn, evaluationNgn: 0 };
-  }, [accounts, selectedAccountIds, liveBalance]);
 
   const targetGBP = evaluation?.targetGBP || 0;
   const localCurrencyCode = evaluation?.localCurrency || 'NGN';
@@ -327,14 +217,12 @@ export const StudentLightDashboard: React.FC<{
     }
 
     if (acc.bankName.includes('UBA') || acc.bankName.includes('United Bank')) {
-       if ((window as any).AndroidBridge) {
-         (window as any).AndroidBridge.triggerSmsSync(acc.accountNumberMasked.slice(-4), acc.bankName);
-         return;
-       } else {
+       const triggered = triggerSmsSync(acc.accountNumberMasked.slice(-4), acc.bankName);
+       if (!triggered) {
          toast.error("SMS Sync is only available in the Basechan Funder Android App.");
          setSyncingId(null);
-         return;
        }
+       return;
     }
 
     try {
@@ -431,10 +319,14 @@ export const StudentLightDashboard: React.FC<{
   };
 
   const handleRetrySync = () => {
-    if (!accountNumberInput || !(window as any).AndroidBridge) return;
+    if (!accountNumberInput) return;
     setIsSavingAndSyncing(true);
     setSyncError(null);
-    (window as any).AndroidBridge.triggerSmsSync(accountNumberInput.slice(-4), selectedBank);
+    const triggered = triggerSmsSync(accountNumberInput.slice(-4), selectedBank);
+    if (!triggered) {
+      toast.error("SMS Sync is only available in the Android App.");
+      setIsSavingAndSyncing(false);
+    }
   };
 
   const handleContinueManual = async () => {
@@ -513,7 +405,7 @@ export const StudentLightDashboard: React.FC<{
 
           {/* CARD 1: Total Liquid Converted Balance */}
           <div className={`w-full flex-shrink-0 transition-all duration-700 transform ${activeMetricCard === 0 ? 'translate-x-0 opacity-100 relative' : '-translate-x-full opacity-0 absolute'}`}>
-            <div className="h-full glass-card p-4 sm:p-6 md:p-14 text-white relative flex flex-col justify-between overflow-hidden !bg-slate-900 !border-white/10 shadow-2xl">
+            <div className="h-full glass-card p-4 sm:p-6 md:p-14 text-white relative flex flex-col justify-between overflow-hidden !bg-zinc-900/90 !border-zinc-800 shadow-none">
               <div className="absolute top-[-20%] right-[-10%] w-[50%] h-[150%] bg-blue-500/10 rounded-full blur-[120px] pointer-events-none" />
 
               <div className="relative z-10 space-y-4 md:space-y-8">
@@ -523,13 +415,13 @@ export const StudentLightDashboard: React.FC<{
                     <h2 className="text-3xl xs:text-4xl sm:text-5xl md:text-7xl font-black tracking-tighter text-depth-header leading-none break-all">
                       £{totals.gbp.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </h2>
-                    <div className="flex justify-between text-[7px] xs:text-[8px] md:text-[9px] font-mono text-slate-400 mt-2 md:mt-4 border-t border-white/5 pt-2 uppercase tracking-tighter">
+                    <div className="flex justify-between text-[7px] xs:text-[8px] md:text-[9px] font-mono text-slate-400 mt-2 md:mt-4 border-t border-slate-200 dark:border-zinc-800 pt-2 uppercase tracking-tighter">
                        <span>CURRENT: £{Math.round(totals.gbp).toLocaleString()}</span>
                        <span>TARGET: {targetGBP > 0 ? `£${targetGBP.toLocaleString()}` : '£0 (NOT SET)'}</span>
                     </div>
                     <div className="mt-2 md:mt-4 flex items-center gap-2 md:gap-3">
                        <p className="text-slate-400 text-base md:text-xl font-bold uppercase tracking-tight text-depth-header">{currency.symbol}{totals.ngn.toLocaleString()}</p>
-                       <span className="px-1.5 py-0.5 rounded bg-white/5 text-[6px] md:text-[9px] font-black uppercase tracking-widest text-slate-500 border border-white/5">{currency.code}</span>
+                       <span className="px-1.5 py-0.5 rounded dark:bg-zinc-800/50 text-[6px] md:text-[9px] font-black uppercase tracking-widest text-slate-500 border border-slate-200 dark:border-zinc-800"> {currency.code}</span>
                     </div>
                   </div>
                 </div>
@@ -555,10 +447,19 @@ export const StudentLightDashboard: React.FC<{
 
                   <button
                     onClick={() => isStaff && onStaffAction ? onStaffAction() : setIsTopUpModalOpen(true)}
-                    className="flex items-center gap-2 text-[8px] md:text-[10px] font-black uppercase tracking-widest text-blue-400 hover:text-blue-300 transition-colors cursor-pointer"
+                    disabled={!isStaff && (appUser?.hasPendingTopUp || appUser?.status === 'TOPUP_PENDING')}
+                    className={`flex items-center gap-2 text-[8px] md:text-[10px] font-black uppercase tracking-widest transition-colors cursor-pointer ${
+                      !isStaff && (appUser?.hasPendingTopUp || appUser?.status === 'TOPUP_PENDING')
+                        ? 'text-amber-500 opacity-80 cursor-not-allowed'
+                        : 'text-blue-400 hover:text-blue-300'
+                    }`}
                   >
-                    <span>{isStaff ? 'UPDATE TOP-UP' : 'REQUEST TOP-UP'}</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
+                    <span>
+                      {isStaff
+                        ? 'UPDATE TOP-UP'
+                        : (appUser?.hasPendingTopUp || appUser?.status === 'TOPUP_PENDING' ? 'TOP-UP REQUEST PENDING' : 'REQUEST TOP UP')}
+                    </span>
+                    {!(appUser?.hasPendingTopUp || appUser?.status === 'TOPUP_PENDING') && <ArrowRight className="w-3.5 h-3.5" />}
                   </button>
                 </div>
               </div>
@@ -567,7 +468,7 @@ export const StudentLightDashboard: React.FC<{
 
           {/* CARD 2: Statutory Holding & Expiration Timer */}
           <div className={`w-full flex-shrink-0 transition-all duration-700 transform ${activeMetricCard === 1 ? 'translate-x-0 opacity-100 relative' : '-translate-x-full opacity-0 absolute'}`}>
-            <div className="h-full glass-card p-10 md:p-14 text-white relative flex flex-col justify-between overflow-hidden !bg-slate-900 !border-white/10 shadow-2xl">
+            <div className="h-full glass-card p-10 md:p-14 text-white relative flex flex-col justify-between overflow-hidden !bg-zinc-900/90 !border-zinc-800 shadow-none">
               <div className="absolute top-[-20%] right-[-10%] w-[50%] h-[150%] bg-amber-500/10 rounded-full blur-[120px] pointer-events-none" />
 
               <div className="relative z-10 space-y-8">
@@ -638,7 +539,7 @@ export const StudentLightDashboard: React.FC<{
                        className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-amber-500 hover:text-amber-400 transition-colors cursor-pointer"
                      >
                        <span>SETUP EVALUATION</span>
-                       <Settings2 className="w-3.5 h-3.5" />
+                       <Settings className="w-3.5 h-3.5" />
                      </button>
                    )}
                 </div>
@@ -678,7 +579,7 @@ export const StudentLightDashboard: React.FC<{
           <p className="text-[9px] md:text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest mt-0.5">Required files for proof of funds verification</p>
         </div>
 
-        <div className="p-4 md:p-8 rounded-2xl md:rounded-[2.5rem] border backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-5 transition-all bg-white border-slate-200 shadow-md dark:bg-slate-900/80 dark:border-white/10 hover:border-blue-500/30">
+        <div className="p-4 md:p-8 rounded-2xl md:rounded-[2.5rem] border backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-5 transition-all bg-white border-slate-200 shadow-md dark:bg-zinc-900/90 dark:border-zinc-800 shadow-none hover:border-blue-500/30">
            <div className="flex items-start gap-3 md:gap-6 w-full sm:w-auto">
               <div className={`w-10 h-10 md:w-16 md:h-16 rounded-xl md:rounded-2xl flex items-center justify-center border shadow-sm shrink-0 ${
                 appUser?.mandateStatus === 'MANDATE_APPROVED' ? 'bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-sky-100 text-sky-900 border-sky-300 dark:bg-sky-950/60 dark:text-sky-300'
@@ -722,7 +623,7 @@ export const StudentLightDashboard: React.FC<{
              <button
                onClick={() => setSelectedAccountIds(accounts.map(a => a.id))}
                aria-label="Select all bank accounts"
-               className="flex-1 lg:flex-none flex items-center justify-center space-x-2 text-[7px] md:text-[9px] font-black uppercase tracking-widest transition-all px-3 py-2 rounded-xl border border-slate-200 dark:border-white/5 hover:bg-slate-100 dark:hover:bg-white/5 text-slate-500"
+               className="flex-1 lg:flex-none flex items-center justify-center space-x-2 text-[7px] md:text-[9px] font-black uppercase tracking-widest transition-all px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-800 hover:bg-slate-100 dark:hover:bg-white/5 text-slate-500"
              >
                <CheckSquare className="w-3 h-3" />
                <span>Select All</span>
@@ -730,7 +631,7 @@ export const StudentLightDashboard: React.FC<{
              <button
                onClick={() => setSelectedAccountIds([])}
                aria-label="Clear selected bank accounts"
-               className="flex-1 lg:flex-none flex items-center justify-center space-x-2 text-[7px] md:text-[9px] font-black uppercase tracking-widest transition-all px-3 py-2 rounded-xl border border-slate-200 dark:border-white/5 hover:bg-slate-100 dark:hover:bg-white/5 text-slate-500"
+               className="flex-1 lg:flex-none flex items-center justify-center space-x-2 text-[7px] md:text-[9px] font-black uppercase tracking-widest transition-all px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-800 hover:bg-slate-100 dark:hover:bg-white/5 text-slate-500"
              >
                <Square className="w-3 h-3" />
                <span>Clear</span>
@@ -1024,182 +925,172 @@ export const StudentLightDashboard: React.FC<{
       </section>
 
       {/* Connect Modal */}
-      {isConnectModalOpen && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-300" onClick={handleCancelConnect}>
-          <div className="w-full max-w-lg glass-card overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="p-8 border-b border-white/5 flex justify-between items-center bg-slate-950/20">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <h3 className="text-2xl font-black text-white uppercase tracking-tight">Connect your Parallex account or other banks</h3>
-                </div>
-              </div>
-              <button onClick={handleCancelConnect} className="p-2 hover:bg-slate-800 rounded-xl transition-colors">
-                <XIcon className="w-6 h-6 text-slate-500" />
-              </button>
-            </div>
-
-            {/* Read-Only Guarantee Banner */}
-            <div className="mx-8 mt-6 p-4 rounded-2xl bg-blue-600/5 border border-blue-500/20 flex items-start gap-3">
-              <ShieldCheck className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
-              <div>
-                <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1">Read-Only Guarantee</p>
-                <p className="text-[10px] text-slate-400 leading-relaxed font-medium">
-                  Basechanfunder only scans financial SMS alerts to verify continuous POF holding. We have <span className="text-white font-bold">ZERO permission</span> to debit, transfer, or move money from your account.
-                </p>
-              </div>
-            </div>
-
-            <div className="p-8 space-y-6">
-              {syncError ? (
-                <div className="space-y-6 text-center py-4 animate-in zoom-in-95 duration-300">
-                  <div className="w-20 h-20 rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mx-auto text-rose-500">
-                    <AlertCircle className="w-10 h-10" />
-                  </div>
-                  <div className="space-y-2">
-                    <h4 className="text-lg font-black uppercase text-white">Bank Not Found</h4>
-                    <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                      We couldn't find a matching SMS alert. What would you like to do?
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <button
-                      onClick={handleRetrySync}
-                      className="py-4 rounded-2xl bg-blue-600 text-white text-xs font-black uppercase tracking-widest hover:bg-blue-500 transition-all shadow-lg shadow-blue-500/20"
-                    >
-                      Try Again
-                    </button>
-                    <button
-                      onClick={() => { setSyncError(null); setSelectedBank(''); setBankSearchQuery(''); }}
-                      className="py-4 rounded-2xl bg-slate-800 text-white text-xs font-black uppercase tracking-widest hover:bg-slate-700 transition-all"
-                    >
-                      Change Bank
-                    </button>
-                    <button
-                      onClick={handleCancelConnect}
-                      className="py-4 rounded-2xl bg-slate-800 text-white text-xs font-black uppercase tracking-widest hover:bg-slate-700 transition-all"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleContinueManual}
-                      className="py-4 rounded-2xl bg-emerald-600 text-white text-xs font-black uppercase tracking-widest hover:bg-emerald-500 transition-all shadow-lg shadow-emerald-500/20"
-                    >
-                      Continue
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <form onSubmit={handleConnectBank} className="space-y-6">
-                  <div className="space-y-4">
-                    <div className="space-y-2 relative">
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Select Bank</label>
-                      <div className="relative">
-                        <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
-                        <input
-                          required
-                          placeholder="Type to search bank..."
-                          value={bankSearchQuery || selectedBank}
-                          onFocus={() => setIsBankDropdownOpen(true)}
-                          onChange={(e) => {
-                            setBankSearchQuery(e.target.value);
-                            setSelectedBank('');
-                            setIsBankDropdownOpen(true);
-                          }}
-                          className={`w-full border rounded-2xl pl-12 pr-4 py-4 text-xs font-bold focus:outline-none transition-all ${
-                            isDark ? 'bg-slate-950 border-white/10 text-white focus:border-blue-500' : 'bg-slate-50 border-slate-200 text-slate-950 focus:border-blue-600'
-                          }`}
-                        />
-                        {isBankDropdownOpen && bankSearchQuery && filteredNigerianBanks.length > 0 && (
-                          <div className={`absolute z-[100] w-full mt-2 max-h-60 overflow-y-auto border rounded-2xl shadow-2xl no-scrollbar ${
-                            isDark ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-200'
-                          }`}>
-                            {filteredNigerianBanks.map(bank => (
-                              <button
-                                key={bank}
-                                type="button"
-                                onClick={() => {
-                                  setSelectedBank(bank);
-                                  setBankSearchQuery(bank);
-                                  setIsBankDropdownOpen(false);
-                                }}
-                                className={`w-full text-left px-6 py-4 text-xs font-black uppercase transition-all hover:bg-blue-600 hover:text-white ${
-                                  selectedBank === bank ? 'bg-blue-600 text-white' : isDark ? 'text-slate-300' : 'text-slate-700'
-                                }`}
-                              >
-                                {bank}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Account Number</label>
-                        <input
-                          required
-                          maxLength={10}
-                          placeholder="10-digit Number"
-                          value={accountNumberInput}
-                          onChange={e => setAccountNumberInput(e.target.value.replace(/\D/g, ''))}
-                          className={`w-full border rounded-2xl px-5 py-4 text-xs font-bold focus:outline-none transition-all ${
-                            isDark ? 'bg-slate-950 border-white/10 text-white focus:border-blue-500' : 'bg-slate-50 border-slate-200 text-slate-950 focus:border-blue-600'
-                          }`}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Account Type</label>
-                        <select
-                          value={selectedAccountType}
-                          onChange={e => setSelectedAccountType(e.target.value as AccountType)}
-                          className={`w-full border rounded-2xl px-5 py-4 text-xs font-bold focus:outline-none transition-all ${
-                            isDark ? 'bg-slate-950 border-white/10 text-white focus:border-blue-500' : 'bg-slate-50 border-slate-200 text-slate-950 focus:border-blue-600'
-                          }`}
-                        >
-                          <option value="SAVINGS">SAVINGS</option>
-                          <option value="CURRENT">CURRENT</option>
-                          <option value="DOMICILIARY">DOMICILIARY</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    {isStaff && (
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Initial Balance (₦)</label>
-                        <input
-                          type="number"
-                          placeholder="Initial Balance (₦)"
-                          value={realAmountInput}
-                          onChange={e => setRealAmountInput(e.target.value)}
-                          className={`w-full border rounded-2xl px-5 py-4 text-xs font-bold focus:outline-none transition-all ${
-                            isDark ? 'bg-slate-950 border-white/10 text-white focus:border-blue-500' : 'bg-slate-50 border-slate-200 text-slate-950 focus:border-blue-600'
-                          }`}
-                        />
-                      </div>
-                    )}
-
-                    <button
-                      type="submit"
-                      disabled={!selectedBank || accountNumberInput.length < 10 || (isStaff && !realAmountInput) || isSavingAndSyncing}
-                      className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-blue-500/20 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 depth-btn-gold"
-                    >
-                      {isSavingAndSyncing ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <>
-                          <span>Save & Sync Ledger</span>
-                          <RefreshCw className="w-4 h-4" />
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </form>
-              )}
-            </div>
+      <GlassModal
+        isOpen={isConnectModalOpen}
+        onClose={handleCancelConnect}
+        title="Connect your Bank Account"
+        maxWidth="max-w-lg"
+      >
+        {/* Read-Only Guarantee Banner */}
+        <div className="mb-6 p-4 rounded-2xl bg-blue-600/5 border border-blue-500/20 flex items-start gap-3">
+          <ShieldCheck className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1">Read-Only Guarantee</p>
+            <p className="text-[10px] text-slate-400 leading-relaxed font-medium">
+              Basechanfunder only scans financial SMS alerts to verify continuous POF holding. We have <span className="text-white font-bold">ZERO permission</span> to debit, transfer, or move money from your account.
+            </p>
           </div>
         </div>
-      )}
+
+        <div>
+          {syncError ? (
+            <div className="space-y-6 text-center py-4 animate-in zoom-in-95 duration-300">
+              <div className="w-20 h-20 rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mx-auto text-rose-500">
+                <AlertCircle className="w-10 h-10" />
+              </div>
+              <div className="space-y-2">
+                <h4 className="text-lg font-black uppercase text-white">Bank Not Found</h4>
+                <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                  We couldn't find a matching SMS alert. What would you like to do?
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  onClick={handleRetrySync}
+                  className="py-4 rounded-2xl bg-blue-600 text-white text-xs font-black uppercase tracking-widest hover:bg-blue-500 transition-all shadow-lg shadow-blue-500/20"
+                >
+                  Try Again
+                </button>
+                <button
+                  onClick={() => { setSyncError(null); setSelectedBank(''); setBankSearchQuery(''); }}
+                  className="py-4 rounded-2xl bg-slate-800 text-white text-xs font-black uppercase tracking-widest hover:bg-slate-700 transition-all"
+                >
+                  Change Bank
+                </button>
+                <button
+                  onClick={handleCancelConnect}
+                  className="py-4 rounded-2xl bg-slate-800 text-white text-xs font-black uppercase tracking-widest hover:bg-slate-700 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleContinueManual}
+                  className="py-4 rounded-2xl bg-emerald-600 text-white text-xs font-black uppercase tracking-widest hover:bg-emerald-500 transition-all shadow-lg shadow-emerald-500/20"
+                >
+                  Continue
+                </button>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleConnectBank} className="space-y-6">
+              <div className="space-y-4">
+                <div className="space-y-2 relative">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Select Bank</label>
+                  <div className="relative">
+                    <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
+                    <input
+                      required
+                      placeholder="Type to search bank..."
+                      value={bankSearchQuery || selectedBank}
+                      onFocus={() => setIsBankDropdownOpen(true)}
+                      onChange={(e) => {
+                        setBankSearchQuery(e.target.value);
+                        setSelectedBank('');
+                        setIsBankDropdownOpen(true);
+                      }}
+                      className={`w-full border rounded-2xl pl-12 pr-4 py-4 text-xs font-bold focus:outline-none transition-all ${
+                        isDark ? 'bg-slate-950 border-white/10 text-white focus:border-blue-500' : 'bg-slate-50 border-slate-200 text-slate-950 focus:border-blue-600'
+                      }`}
+                    />
+                    {isBankDropdownOpen && bankSearchQuery && filteredNigerianBanks.length > 0 && (
+                      <div className={`absolute z-[100] w-full mt-2 max-h-60 overflow-y-auto border rounded-2xl shadow-2xl no-scrollbar ${
+                        isDark ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-200'
+                      }`}>
+                        {filteredNigerianBanks.map(bank => (
+                          <button
+                            key={bank}
+                            type="button"
+                            onClick={() => {
+                              setSelectedBank(bank);
+                              setBankSearchQuery(bank);
+                              setIsBankDropdownOpen(false);
+                            }}
+                            className={`w-full text-left px-6 py-4 text-xs font-black uppercase transition-all hover:bg-blue-600 hover:text-white ${
+                              selectedBank === bank ? 'bg-blue-600 text-white' : isDark ? 'text-slate-300' : 'text-slate-700'
+                            }`}
+                          >
+                            {bank}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Account Number</label>
+                    <input
+                      required
+                      maxLength={10}
+                      placeholder="10-digit Number"
+                      value={accountNumberInput}
+                      onChange={e => setAccountNumberInput(e.target.value.replace(/\D/g, ''))}
+                      className={`w-full border rounded-2xl px-5 py-4 text-xs font-bold focus:outline-none transition-all ${
+                        isDark ? 'bg-slate-950 border-white/10 text-white focus:border-blue-500' : 'bg-slate-50 border-slate-200 text-slate-950 focus:border-blue-600'
+                      }`}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Account Type</label>
+                    <select
+                      value={selectedAccountType}
+                      onChange={e => setSelectedAccountType(e.target.value as AccountType)}
+                      className={`w-full border rounded-2xl px-5 py-4 text-xs font-bold focus:outline-none transition-all ${
+                        isDark ? 'bg-slate-950 border-white/10 text-white focus:border-blue-500' : 'bg-slate-50 border-slate-200 text-slate-950 focus:border-blue-600'
+                      }`}
+                    >
+                      <option value="SAVINGS">SAVINGS</option>
+                      <option value="CURRENT">CURRENT</option>
+                      <option value="DOMICILIARY">DOMICILIARY</option>
+                    </select>
+                  </div>
+                </div>
+
+                {isStaff && (
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Initial Balance (₦)</label>
+                    <input
+                      type="number"
+                      placeholder="Initial Balance (₦)"
+                      value={realAmountInput}
+                      onChange={e => setRealAmountInput(e.target.value)}
+                      className={`w-full border rounded-2xl px-5 py-4 text-xs font-bold focus:outline-none transition-all ${
+                        isDark ? 'bg-slate-950 border-white/10 text-white focus:border-blue-500' : 'bg-slate-50 border-slate-200 text-slate-950 focus:border-blue-600'
+                      }`}
+                    />
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={!selectedBank || accountNumberInput.length < 10 || (isStaff && !realAmountInput) || isSavingAndSyncing}
+                  className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-blue-500/20 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 depth-btn-gold"
+                >
+                  {isSavingAndSyncing ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      <span>Save & Sync Ledger</span>
+                      <RefreshCw className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      </GlassModal>
 
       {!isStaff && (
         <TopUpRequestModal
@@ -1232,59 +1123,54 @@ export const StudentLightDashboard: React.FC<{
       />
 
       {/* Unlink Request Modal */}
-      {isUnlinkModalOpen && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300">
-          <div className={`w-full max-w-md rounded-[2.5rem] border overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 ${isDark ? 'bg-[#0D111A] border-white/10' : 'bg-white border-slate-200'}`}>
-             <div className="p-8 border-b border-white/5 flex justify-between items-center">
-                <h3 className="text-xl font-black text-white uppercase tracking-tight">Request Account Unlink</h3>
-                <button onClick={() => setIsUnlinkModalOpen(false)} className="p-2 hover:bg-white/5 rounded-xl transition-colors">
-                  <XIcon className="w-5 h-5 text-slate-500" />
-                </button>
-             </div>
-             <div className="p-8 space-y-6">
-                <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20">
-                   <p className="text-[10px] font-bold text-rose-300 uppercase tracking-widest leading-relaxed">
-                      Unlinking an account will immediately stop the continuous 28-day holding verification. This may reset your compliance progress.
-                   </p>
-                </div>
-                <div className="space-y-2">
-                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Reason for unlinking</label>
-                   <textarea
-                     value={unlinkReason}
-                     onChange={e => setUnlinkReason(e.target.value)}
-                     placeholder="e.g. Account closed, Switching banks..."
-                     className="w-full h-32 bg-slate-950 border border-white/10 rounded-2xl px-5 py-4 text-xs font-medium text-white focus:outline-none focus:border-rose-500 transition-all resize-none"
-                   />
-                </div>
-                <button
-                  onClick={handleRequestUnlink}
-                  disabled={!unlinkReason.trim()}
-                  className="w-full py-4 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-rose-500/20 active:scale-95 transition-all"
-                >
-                  Submit Unlink Request
-                </button>
-             </div>
+      <GlassModal
+        isOpen={isUnlinkModalOpen}
+        onClose={() => setIsUnlinkModalOpen(false)}
+        title="Request Account Unlink"
+        maxWidth="max-w-md"
+      >
+        <div className="space-y-6">
+          <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20">
+            <p className="text-[10px] font-bold text-rose-300 uppercase tracking-widest leading-relaxed">
+              Unlinking an account will immediately stop the continuous 28-day holding verification. This may reset your compliance progress.
+            </p>
           </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Reason for unlinking</label>
+            <textarea
+              value={unlinkReason}
+              onChange={e => setUnlinkReason(e.target.value)}
+              placeholder="e.g. Account closed, Switching banks..."
+              className="w-full h-32 bg-slate-950 border border-white/10 rounded-2xl px-5 py-4 text-xs font-medium text-white focus:outline-none focus:border-rose-500 transition-all resize-none"
+            />
+          </div>
+          <button
+            onClick={handleRequestUnlink}
+            disabled={!unlinkReason.trim()}
+            className="w-full py-4 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-rose-500/20 active:scale-95 transition-all"
+          >
+            Submit Unlink Request
+          </button>
         </div>
-      )}
+      </GlassModal>
 
-      {isExpiredModalOpen && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className={`w-full max-w-md rounded-[2.5rem] border overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 ${isDark ? 'bg-[#0D111A] border-white/10' : 'bg-white border-slate-200'}`}>
-            <div className="p-8 text-center space-y-6">
-              <div className="w-20 h-20 rounded-3xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mx-auto text-rose-500">
-                <Lock className="w-10 h-10" />
-              </div>
-              <h3 className={`text-2xl font-black uppercase tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>Account Expired</h3>
-              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-2">Evaluation Period Concluded</p>
-              <div className={`p-6 rounded-2xl border italic text-xs font-medium leading-relaxed ${isDark ? 'bg-slate-950 border-white/5 text-slate-300' : 'bg-slate-50 border-slate-100 text-slate-600'}`}>
-                "{evaluation?.timerCustomMessage || 'Your evaluation period has ended. Please contact your counselor to extend access.'}"
-              </div>
-              <button onClick={() => setIsExpiredModalOpen(false)} className="w-full py-4 bg-rose-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all">Understood</button>
-            </div>
+      <GlassModal
+        isOpen={isExpiredModalOpen}
+        onClose={() => setIsExpiredModalOpen(false)}
+        title="Account Expired"
+        maxWidth="max-w-md"
+      >
+        <div className="text-center space-y-6">
+          <div className="w-20 h-20 rounded-3xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mx-auto text-rose-500">
+            <Lock className="w-10 h-10" />
           </div>
+          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-2">Evaluation Period Concluded</p>
+          <div className={`p-6 rounded-2xl border italic text-xs font-medium leading-relaxed ${isDark ? 'bg-slate-950 border-white/5 text-slate-300' : 'bg-slate-50 border-slate-100 text-slate-600'}`}>
+            "{evaluation?.timerCustomMessage || 'Your evaluation period has ended. Please contact your counselor to extend access.'}"
+          </div>
+          <button onClick={() => setIsExpiredModalOpen(false)} className="w-full py-4 bg-rose-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all">Understood</button>
         </div>
-      )}
+      </GlassModal>
 
       {/* Profile FAB - Student Side */}
       {!isStaff && role === 'STUDENT' && (
@@ -1306,7 +1192,8 @@ export const StudentLightDashboard: React.FC<{
       <StudentProfileModal
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
-        userData={appUser}
+        onRequestTopUp={() => setIsTopUpModalOpen(true)}
+        userProfile={appUser}
         consolidatedBalance={accounts.reduce((sum, acc) => sum + acc.balanceNgn, 0)}
         holdingProgress={evaluation?.consecutiveDays ? Math.min(Math.round((evaluation.consecutiveDays / 28) * 100), 100) : 0}
       />

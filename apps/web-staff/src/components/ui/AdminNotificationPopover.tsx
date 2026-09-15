@@ -261,7 +261,7 @@ export const AdminNotificationPopover: React.FC<AdminNotificationPopoverProps> =
           isOpen
             ? 'bg-amber-500/10 border-amber-500/40 text-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.2)]'
             : hasFreshNotification
-              ? 'bg-blue-500/10 border-blue-500/40 text-blue-500 animate-pulse shadow-[0_0_15px_rgba(59,130,246,0.4)]'
+              ? 'bg-blue-500/10 border-slate-200 dark:border-zinc-800 text-blue-500 animate-pulse shadow-none'
               : unreadCount > 0
                 ? 'bg-amber-500/10 border-amber-500/40 text-amber-500 animate-pulse shadow-[0_0_15px_rgba(245,158,11,0.4)]'
                 : 'bg-white/5 border-white/5 text-slate-300 hover:text-white'
@@ -275,7 +275,7 @@ export const AdminNotificationPopover: React.FC<AdminNotificationPopoverProps> =
 
       {/* Popover Window */}
       {isOpen && (
-        <div className="absolute right-0 mt-3 w-[360px] bg-white border-slate-200 dark:bg-slate-900 dark:border-white/15 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.8)] z-[500] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-top-right">
+        <div className="absolute right-0 mt-3 w-[360px] bg-white border-slate-200 dark:bg-slate-900 dark:border-zinc-800 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.8)] z-[500] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-top-right">
 
           {/* Header */}
           <div className="p-4 border-b border-slate-200 dark:border-white/5 flex justify-between items-center bg-slate-50 dark:bg-slate-950/40">

@@ -89,12 +89,12 @@ export const BankStatementView: React.FC<BankStatementViewProps> = ({ isOpen, on
 
   return (
     <div className="fixed inset-0 z-[250] flex items-center justify-end bg-slate-950/60 backdrop-blur-md animate-in fade-in duration-500 overflow-hidden">
-      <div className={`h-full w-full max-w-4xl border-l shadow-2xl flex flex-col animate-in slide-in-from-right duration-500 overflow-hidden ${isDark ? 'bg-[#030712] border-white/5' : 'bg-slate-50 border-slate-200'}`}>
+      <div className={`h-full w-full max-w-4xl border-l shadow-2xl flex flex-col animate-in slide-in-from-right duration-500 overflow-hidden ${isDark ? 'bg-[#030712] border-slate-200 dark:border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
 
         {/* Header */}
-        <header className="p-8 border-b border-white/5 flex justify-between items-center bg-slate-950/20">
+        <header className="p-8 border-b border-slate-200 dark:border-zinc-800 flex justify-between items-center bg-slate-950/20">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-blue-600/10 border border-blue-500/20 flex items-center justify-center text-blue-500">
+            <div className="w-12 h-12 rounded-2xl bg-blue-600/10 border border-slate-200 dark:border-zinc-800 flex items-center justify-center text-blue-500">
               <FileText className="w-6 h-6" />
             </div>
             <div>
@@ -120,7 +120,7 @@ export const BankStatementView: React.FC<BankStatementViewProps> = ({ isOpen, on
           {/* Summary Banner */}
           <section className="p-4 sm:p-8">
              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-                <div className="p-6 rounded-2xl bg-slate-900/40 border border-white/5 space-y-2">
+                <div className="p-6 rounded-2xl bg-slate-900/40 border border-slate-200 dark:border-zinc-800 space-y-2">
                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Link Date</p>
                    <div className="flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-blue-400" />
@@ -133,14 +133,14 @@ export const BankStatementView: React.FC<BankStatementViewProps> = ({ isOpen, on
                       </span>
                    </div>
                 </div>
-                <div className="p-6 rounded-2xl bg-slate-900/40 border border-white/5 space-y-2">
+                <div className="p-6 rounded-2xl bg-slate-900/40 border border-slate-200 dark:border-zinc-800 space-y-2">
                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Total Inflow</p>
                    <div className="flex items-center gap-2">
                       <TrendingUp className="w-4 h-4 text-emerald-400" />
                       <span className="text-xl font-black text-emerald-400">₦{metrics.inflow.toLocaleString()}</span>
                    </div>
                 </div>
-                <div className="p-6 rounded-2xl bg-slate-900/40 border border-white/5 space-y-2">
+                <div className="p-6 rounded-2xl bg-slate-900/40 border border-slate-200 dark:border-zinc-800 space-y-2">
                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Total Outflow</p>
                    <div className="flex items-center gap-2">
                       <TrendingDown className="w-4 h-4 text-rose-400" />
@@ -159,21 +159,21 @@ export const BankStatementView: React.FC<BankStatementViewProps> = ({ isOpen, on
                   placeholder="Search description or type..."
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
-                  className="w-full bg-slate-950 border border-white/10 rounded-2xl pl-12 pr-6 py-4 text-xs text-white focus:outline-none focus:border-blue-500 transition-all"
+                  className="w-full bg-slate-950 border border-slate-200 dark:border-zinc-800 rounded-2xl pl-12 pr-6 py-4 text-xs text-white focus:outline-none focus:border-blue-500 transition-all"
                 />
              </div>
-             <button className="px-6 py-4 bg-slate-900 border border-white/5 rounded-2xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-white transition-all whitespace-nowrap">
+             <button className="px-6 py-4 bg-zinc-900/90 border-zinc-800 shadow-none rounded-2xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-white transition-all whitespace-nowrap">
                 Filter by Date
              </button>
           </div>
 
           {/* Ledger Table */}
           <div className="px-4 sm:px-8 pb-8">
-             <div className="border border-white/5 rounded-3xl overflow-hidden bg-slate-950/20">
+             <div className="border border-slate-200 dark:border-zinc-800 rounded-3xl overflow-hidden bg-slate-950/20">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse min-w-[600px]">
                      <thead>
-                        <tr className="text-[10px] font-black uppercase tracking-widest text-slate-500 bg-slate-950/40 border-b border-white/5">
+                        <tr className="text-[10px] font-black uppercase tracking-widest text-slate-500 bg-slate-950/40 border-b border-slate-200 dark:border-zinc-800">
                            <th className="px-6 py-5">Date & Time</th>
                            <th className="px-6 py-5">Description</th>
                            <th className="px-6 py-5">Type</th>
@@ -181,7 +181,7 @@ export const BankStatementView: React.FC<BankStatementViewProps> = ({ isOpen, on
                            <th className="px-6 py-5 text-right">Balance (NGN)</th>
                         </tr>
                      </thead>
-                     <tbody className="divide-y divide-white/5">
+                     <tbody className="divide-y divide-zinc-800">
                         {filteredTransactions.map(t => (
                            <tr key={t.id} className="hover:bg-white/5 transition-colors group">
                               <td className="px-6 py-5">
@@ -226,7 +226,7 @@ export const BankStatementView: React.FC<BankStatementViewProps> = ({ isOpen, on
         </div>
 
         {/* Footer */}
-        <footer className="p-6 border-t border-white/5 bg-slate-950/40 flex justify-between items-center">
+        <footer className="p-6 border-t border-slate-200 dark:border-zinc-800 bg-slate-950/40 flex justify-between items-center">
            <div className="flex items-center gap-3">
               <ShieldCheck className="w-4 h-4 text-emerald-500" />
               <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Signed & Verified by Basechan Compliance Node</span>

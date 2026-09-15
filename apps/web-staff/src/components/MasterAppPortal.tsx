@@ -69,7 +69,7 @@ import { toast } from 'sonner';
 export const MasterAppPortal: React.FC = () => {
   const { appUser, role, currentUser, loading: authLoading, refreshProfile } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const { balance, accounts: balanceAccounts, loading: balanceLoading } = useUserBalance(currentUser?.uid);
+  const { balance, accounts: balanceAccounts, evaluation, loading: balanceLoading } = useUserBalance(currentUser?.uid);
   const navigate = useNavigate();
 
   // Navigation State
@@ -84,7 +84,7 @@ export const MasterAppPortal: React.FC = () => {
   // Profile Drawer State (Accessible globally in portal)
   const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
   const [selectedStudentForDrawer, setSelectedStudentForDrawer] = useState<any>(null);
-  const [drawerTab, setDrawerTab] = useState<'profile' | 'activity'>('profile');
+  const [drawerTab, setDrawerTab] = useState<'profile' | 'activity' | 'governance'>('profile');
   const [highlightEventId, setHighlightEventId] = useState<string | null>(null);
 
   // Profile Menu State
@@ -159,7 +159,9 @@ export const MasterAppPortal: React.FC = () => {
     isApproved: appUser.isApproved,
     onboardingComplete: !!appUser.onboardingComplete || !!(appUser as any).setupCompleted,
     status: (appUser as any).status,
-    verificationFailed: (appUser as any).verificationFailed
+    verificationFailed: (appUser as any).verificationFailed,
+    targetGbp: appUser.onboardingProfile?.targetGbp || 0,
+    consecutiveDays: (appUser as any).consecutiveDays || 0
   }) : null;
 
   if (authLoading || !appUser || !currentUser) {
@@ -200,7 +202,7 @@ export const MasterAppPortal: React.FC = () => {
       {/* ── Native Status Bar Spacer / "Border" ── */}
       {isNative && (
         <div className={`h-8 w-full flex-shrink-0 z-[200] border-y transition-colors duration-500 ${
-          isDark ? 'bg-slate-950 border-white/10' : 'bg-white border-slate-200 shadow-sm'
+          isDark ? 'bg-slate-950 border-slate-200 dark:border-zinc-800' : 'bg-white border-slate-200 shadow-sm'
         }`} />
       )}
 
@@ -266,9 +268,14 @@ export const MasterAppPortal: React.FC = () => {
               {inspectingStudentId ? (
                 <div className="flex items-center gap-2.5">
                   <button
-                    onClick={() => setInspectingStudentId(null)}
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setInspectingStudentId(null);
+                    }}
                     aria-label="Exit student view"
-                    className="flex items-center gap-1.5 bg-slate-900 border border-white/10 text-white px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg depth-btn-glass shrink-0"
+                    className="flex items-center gap-1.5 bg-zinc-900/90 border-zinc-800 shadow-none text-white px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg depth-btn-glass shrink-0"
                   >
                     <ArrowLeft className="w-2.5 h-2.5" />
                     <span>Exit</span>
@@ -316,7 +323,12 @@ export const MasterAppPortal: React.FC = () => {
 
                {/* Profile FAB Button */}
                <button
-                  onClick={() => setIsProfileOpen(!isProfileOpen)}
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsProfileOpen(!isProfileOpen);
+                  }}
                   aria-label="User menu"
                   className={`w-9 h-9 sm:w-11 sm:h-11 rounded-full border-2 p-0.5 transition-all hover:scale-105 active:scale-95 shadow-xl ${
                     isDark
@@ -324,7 +336,7 @@ export const MasterAppPortal: React.FC = () => {
                       : 'border-blue-600 shadow-blue-600/10 bg-white'
                   }`}
                >
-                  <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center bg-slate-800 border border-white/5">
+                  <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center bg-slate-800 border border-slate-200 dark:border-zinc-800">
                     {appUser.photoURL ? (
                       <img src={appUser.photoURL} alt="User Profile" className="w-full h-full object-cover" />
                     ) : (
@@ -337,7 +349,7 @@ export const MasterAppPortal: React.FC = () => {
                {isProfileOpen && (
                  <div className={`absolute right-0 top-full mt-2 w-64 rounded-2xl shadow-2xl z-[150] p-1.5 space-y-0.5 animate-in fade-in zoom-in-95 duration-200 origin-top-right border ${
                    isDark
-                     ? 'bg-slate-900 backdrop-blur-[75px] border-white/10 text-white shadow-[0_20px_60px_rgba(0,0,0,0.8)]'
+                     ? 'bg-zinc-900/90 backdrop-blur-[75px] border-zinc-800 text-white shadow-none'
                      : 'bg-white border-slate-200 text-slate-900 shadow-[0_20px_60px_rgba(0,0,0,0.15)]'
                  }`}>
                    <div className="p-3 border-b border-white/5 mb-1">
@@ -350,7 +362,12 @@ export const MasterAppPortal: React.FC = () => {
 
                       {/* Theme Toggle Inside Dropdown */}
                       <button
-                        onClick={(e) => toggleTheme(e)}
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          toggleTheme(e);
+                        }}
                         className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wide transition-all ${
                           isDark ? 'text-slate-300 hover:bg-white/5' : 'text-slate-700 hover:bg-slate-100'
                         }`}
@@ -364,7 +381,10 @@ export const MasterAppPortal: React.FC = () => {
 
                       {/* Profile Settings */}
                       <button
-                        onClick={() => {
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
                           setIsProfileModalOpen(true);
                           setIsProfileOpen(false);
                         }}
@@ -379,7 +399,10 @@ export const MasterAppPortal: React.FC = () => {
                       {/* Support Button (Student Only) */}
                       {role === 'STUDENT' && (
                         <button
-                          onClick={() => {
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
                             setIsSupportOpen(true);
                             setIsProfileOpen(false);
                           }}
@@ -399,7 +422,10 @@ export const MasterAppPortal: React.FC = () => {
                           {navItems.map((item) => (
                             <button
                               key={item.id}
-                              onClick={() => {
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
                                 if (item.id === 'support') setIsAdminSupportOpen(true);
                                 else if (item.id === 'params' || item.id === 'database') {
                                   setActiveTab(item.id);
@@ -424,7 +450,12 @@ export const MasterAppPortal: React.FC = () => {
 
                    <div className={`pt-1 border-t ${isDark ? 'border-white/5' : 'border-slate-100'}`}>
                      <button
-                       onClick={() => signOut(auth)}
+                       type="button"
+                       onClick={(e) => {
+                         e.preventDefault();
+                         e.stopPropagation();
+                         signOut(auth);
+                       }}
                        className="w-full flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase text-rose-500 hover:bg-rose-500/10 transition-all"
                      >
                        <LogOut className="w-3 h-3" />
@@ -455,7 +486,10 @@ export const MasterAppPortal: React.FC = () => {
                     <Loader2 className="w-3 h-3 text-amber-500 animate-spin" />
                     <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Awaiting Clearance...</span>
                     <button
-                      onClick={async () => {
+                      type="button"
+                      onClick={async (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
                         const t = toast.loading('Re-verifying approval...');
                         await refreshProfile();
                         toast.success('Check complete.', { id: t });
@@ -484,9 +518,9 @@ export const MasterAppPortal: React.FC = () => {
                             setSupportInitialStudentId(id);
                             setIsAdminSupportOpen(true);
                           }}
-                          onViewProfile={(student) => {
+                          onViewProfile={(student, tab) => {
                             setSelectedStudentForDrawer(student);
-                            setDrawerTab('profile');
+                            setDrawerTab(tab || 'profile');
                             setIsProfileDrawerOpen(true);
                           }}
                         />
@@ -498,9 +532,9 @@ export const MasterAppPortal: React.FC = () => {
                             setSupportInitialStudentId(id);
                             setIsAdminSupportOpen(true);
                           }}
-                          onViewProfile={(student) => {
+                          onViewProfile={(student, tab) => {
                             setSelectedStudentForDrawer(student);
-                            setDrawerTab('profile');
+                            setDrawerTab(tab || 'profile');
                             setIsProfileDrawerOpen(true);
                           }}
                         />
@@ -535,7 +569,7 @@ export const MasterAppPortal: React.FC = () => {
               animate="animate"
               exit="exit"
               className={`w-full max-w-6xl h-[90vh] rounded-[2.5rem] border overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.85)] flex flex-col ${
-                isDark ? 'bg-[#0D111A] border-white/10' : 'bg-white border-slate-200'
+                isDark ? 'bg-[#0D111A] border-slate-200 dark:border-zinc-800' : 'bg-white border-slate-200'
               }`}
               onClick={e => e.stopPropagation()}
             >
@@ -572,7 +606,7 @@ export const MasterAppPortal: React.FC = () => {
               animate="animate"
               exit="exit"
               className={`w-full max-w-5xl h-[85vh] rounded-[2.5rem] border overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.85)] flex flex-col ${
-                isDark ? 'bg-[#0D111A] border-white/10' : 'bg-white border-slate-200'
+                isDark ? 'bg-[#0D111A] border-slate-200 dark:border-zinc-800' : 'bg-white border-slate-200'
               }`}
               onClick={e => e.stopPropagation()}
             >
@@ -614,7 +648,26 @@ export const MasterAppPortal: React.FC = () => {
       <StudentProfileModal
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
-        userData={appUser}
+        onUpdate={refreshProfile}
+        userProfile={{
+          ...appUser,
+          ...appUser?.onboardingProfile,
+          targetAmountGbp: evaluation?.targetGBP,
+          windowStartDate: evaluation?.startDate,
+          targetDays: evaluation?.totalTargetDays,
+          evaluationWindowDays: evaluation?.evaluationWindowDays,
+          extensionDays: evaluation?.extensionDays,
+          approvedTopUpNgn: appUser?.approvedCapitalNgn || appUser?.topUpAmountNgn || evaluation?.approvedTopUpNgn,
+          targetAmountNgn: evaluation?.targetNGN || (evaluation?.targetGBP * 1945.50) // Fallback rate
+        }}
+        consolidatedBalance={balance.consolidatedBalanceNgn}
+        holdingProgress={(() => {
+          if (!evaluation?.startDate) return 0;
+          const start = new Date(evaluation.startDate).getTime();
+          const target = evaluation.totalTargetDays || 28;
+          const days = Math.min(Math.max(Math.floor((Date.now() - start) / 86400000) + 1, 1), target);
+          return Math.round((days / target) * 100);
+        })()}
       />
     </div>
   );

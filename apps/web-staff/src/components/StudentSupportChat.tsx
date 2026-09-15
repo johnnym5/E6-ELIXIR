@@ -101,17 +101,17 @@ export const StudentSupportChat: React.FC<StudentSupportChatProps> = ({ onClose,
       {isPopUp && (
         <div className="fixed inset-0 z-[190] bg-black/50 backdrop-blur-xs sm:hidden" onClick={onClose} />
       )}
-      <div className={`flex flex-col bg-[#0D1424] border border-blue-500/30 overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-300 ${
+      <div className={`flex flex-col bg-[#0D1424] border border-slate-200 dark:border-zinc-800 overflow-hidden shadow-none animate-in fade-in zoom-in-95 duration-300 ${
         isPopUp
-          ? 'fixed top-[4.5rem] right-3 sm:right-6 sm:w-96 max-h-[75vh] h-[480px] rounded-3xl z-[200] max-w-[calc(100vw-1.5rem)] shadow-[0_20px_60px_rgba(0,0,0,0.8)]'
+          ? 'fixed top-[4.5rem] right-3 sm:right-6 sm:w-96 max-h-[75vh] h-[480px] rounded-3xl z-[200] max-w-[calc(100vw-1.5rem)] shadow-none'
           : 'h-[80vh] w-full max-w-md mx-auto rounded-3xl'
       }`}>
 
         {/* Chat Header */}
-        <header className="p-4 sm:p-5 border-b border-white/10 bg-slate-900/80 backdrop-blur-xl flex items-center justify-between">
+        <header className="p-4 sm:p-5 border-b border-slate-200 dark:border-zinc-800 bg-slate-900/80 backdrop-blur-xl flex items-center justify-between">
           <div className="flex items-center space-x-3 min-w-0">
             <div className="relative shrink-0">
-              <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400">
+              <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-slate-200 dark:border-zinc-800 flex items-center justify-center text-blue-400">
                 <ShieldCheck className="w-5 h-5" />
               </div>
             </div>
@@ -144,8 +144,8 @@ export const StudentSupportChat: React.FC<StudentSupportChatProps> = ({ onClose,
             <div key={msg.id} className={`flex ${msg.isAdmin ? 'justify-start' : 'justify-end'}`}>
               <div className={`max-w-[82%] p-3.5 rounded-2xl text-xs leading-relaxed ${
                 msg.isAdmin
-                  ? 'bg-slate-900 border border-white/10 text-slate-200 rounded-bl-none'
-                  : 'bg-blue-600 text-white font-medium rounded-br-none shadow-md shadow-blue-500/20'
+                  ? 'bg-zinc-900/90 border-zinc-800 shadow-none text-slate-200 rounded-bl-none'
+                  : 'bg-blue-600 text-white font-medium rounded-br-none shadow-md'
               }`}>
                 {msg.text}
               </div>
@@ -155,8 +155,8 @@ export const StudentSupportChat: React.FC<StudentSupportChatProps> = ({ onClose,
         </div>
 
         {/* Input Bar */}
-        <div className="p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xl border-t border-white/10">
-          <form onSubmit={handleSendMessage} className="flex items-center space-x-2 bg-slate-950 border border-white/10 p-1.5 rounded-2xl focus-within:border-blue-500/50 transition-all">
+        <div className="p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xl border-t border-slate-200 dark:border-zinc-800">
+          <form onSubmit={handleSendMessage} className="flex items-center space-x-2 bg-slate-950 border border-slate-200 dark:border-zinc-800 p-1.5 rounded-2xl focus-within:border-blue-500/50 transition-all">
             <input
               type="text"
               placeholder="Type your message..."
