@@ -2,50 +2,65 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper: Check if requester is Admin by Email or Role
+    // Helper: Fetch user data from the Firestore document
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // Helper: Check if requester is Admin (By Email or Firestore Role)
     function isAdmin() {
       return request.auth != null && (
         request.auth.token.email.matches('.*@basechaninternational\\.com$') ||
         request.auth.token.email.matches('.*\\.basechaninternational@gmail\\.com$') ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ADMIN_GOVERNANCE')
+         getUserData().role in ['ADMIN', 'ADMIN_GOVERNANCE'])
       );
     }
 
-    // Helper: Basic active session check
-    function isAuthenticated() {
-      return request.auth != null;
+    function isStaff() {
+       return request.auth != null && (isAdmin() || getUserData().role in ['COUNSELOR', 'STAFF_AUDITOR']);
     }
 
-    // ── Global Catch-all for Admins ──
-    match /{document=**} {
-      allow read, write: if isAdmin();
-    }
-
-    // ── Standard User Access ──
+    // ── Users Collection ──
     match /users/{userId} {
-      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
-      allow create: if isAuthenticated() && request.auth.uid == userId;
-      allow update, delete: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow read: if true;
+
+      // Users can write their own profile, Admins can write any
+      allow write: if request.auth != null && (request.auth.uid == userId || isAdmin());
 
       match /{allPaths=**} {
-        allow read, write: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+        allow read, write: if request.auth != null && (request.auth.uid == userId || isAdmin() || isStaff());
       }
     }
 
-    // ── Public/Authenticated Read Collections ──
+    // ── Financial Accounts & Ledgers ──
+    match /financial_accounts/{docId} {
+      allow read, write: if request.auth != null && (resource.data.userId == request.auth.uid || isAdmin() || isStaff());
+    }
+
+    match /pof_evaluations/{docId} {
+      allow read, write: if request.auth != null && (resource.data.userId == request.auth.uid || isAdmin() || isStaff());
+    }
+
+    match /topup_requests/{docId} {
+      allow read, create: if request.auth != null;
+      allow update, delete: if isAdmin();
+    }
+
+    // ── System Configuration ──
     match /system_config/{doc=**} {
-      allow read: if isAuthenticated();
+      allow read: if true;
       allow write: if isAdmin();
     }
 
-    // Fallback for other collections
+    // ── Fallback for all other collections ──
     match /{collectionId}/{docId} {
-       allow read, write: if isAuthenticated() && (
-         isAdmin() ||
-         (resource != null && resource.data.userId == request.auth.uid) ||
-         (request.method == 'create')
-       );
+      allow read, write: if request.auth != null && (
+        isAdmin() ||
+        isStaff() ||
+        (request.method == 'create') ||
+        (resource != null && resource.data.userId == request.auth.uid)
+      );
     }
   }
 }

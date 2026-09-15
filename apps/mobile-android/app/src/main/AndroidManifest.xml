@@ -12,7 +12,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:windowSoftInputMode="adjustResize"
-        android:theme="@style/Theme.BasechanfunderMobile">
+        android:theme="@style/Theme.E6ElixirMobile">
         <activity
             android:name=".MainActivity"
             android:exported="true">

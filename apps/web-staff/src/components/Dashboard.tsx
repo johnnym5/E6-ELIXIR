@@ -58,6 +58,7 @@ import { StudentTableFilters, FilterCriteria } from './StudentTableFilters';
 import { toast } from 'sonner';
 
 import { resolveUserStatus, ComplianceStatus } from '../services/userStatusService';
+import { purgeUserClientSide } from '../utils/governanceService';
 import { executeSoftReset } from '../utils/softResetService';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -857,21 +858,14 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({ onInspect, onMes
         try {
           const uid = selectedStudent.userId || selectedStudent.id;
 
-          // ─── CALL HARD PURGE ENDPOINT ───
-          const response = await fetch(`/api/v1/admin/users/${uid}/purge`, {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' }
-          });
+          // ─── DIRECT CLIENT-SIDE PURGE (BaaS Mode) ───
+          const result = await purgeUserClientSide(uid);
 
-          const text = await response.text();
-          let result: any = {};
-          try { if (text) result = JSON.parse(text); } catch (e) {}
-
-          if (response.ok || result.success) {
-            toast.success('Database & Storage successfully purged.', { id: t });
+          if (result.success) {
+            toast.success(result.message, { id: t });
             setSelectedStudent(null);
           } else {
-            throw new Error(result.message || "Hard purge failed on server");
+            throw new Error(result.message);
           }
         } catch (err: any) {
           toast.error('Purge failed: ' + err.message, { id: t });

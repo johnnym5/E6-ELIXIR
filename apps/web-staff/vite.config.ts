@@ -28,14 +28,6 @@ export default defineConfig({
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
     },
-    proxy: {
-      '/api': {
-        target: 'http://127.0.0.1:3000', // Use IP instead of localhost
-        changeOrigin: true,
-        secure: false,
-        rewrite: (path) => path // Ensure path is preserved
-      },
-    },
   },
   preview: {
     host: '0.0.0.0',

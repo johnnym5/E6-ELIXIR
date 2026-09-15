@@ -11,8 +11,7 @@ import { MandateSignatureUpload } from './MandateSignatureUpload';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { FormConsent } from './ui/FormConsent';
-import { generateMandateOverlayClientSide, stampMandateTemplate } from '../utils/clientMandateGenerator';
-import { compileStudentPackageClientSide } from '../utils/clientPdfCompiler';
+import { generateMandateOverlayClientSide, stampMandateTemplate, generateAndUploadMandatePackage } from '../utils/pdfEngine';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -130,16 +129,20 @@ export const AccountMandateWizard: React.FC<AccountMandateWizardProps> = ({ isOp
     setIsSubmitting(true);
     const t = toast.loading('Compiling regulatory package...');
     try {
-      const filesToCompile = [
-        { id: 'signed_upgrade_form', value: signedMandate!, fileType: 'image/jpeg', fileName: 'signed_mandate.jpg' },
-        { id: 'passport_photo', value: files.passport_photo, fileType: 'image/jpeg', fileName: 'passport.jpg' },
-        { id: 'id_data_page', value: files.id_data_page, fileType: 'image/jpeg', fileName: 'id_page.jpg' },
-        { id: 'utility_bill', value: files.utility_bill, fileType: 'image/jpeg', fileName: 'utility.jpg' },
-        { id: 'nin_doc', value: files.nin_doc, fileType: 'image/jpeg', fileName: 'nin.jpg' },
-        { id: 'bvn_doc', value: files.bvn_doc, fileType: 'image/jpeg', fileName: 'bvn.jpg' }
+      const supportingDocs = [
+        { id: 'signed_upgrade_form', url: signedMandate!, fileType: 'image/jpeg' },
+        { id: 'passport_photo', url: files.passport_photo, fileType: 'image/jpeg' },
+        { id: 'id_data_page', url: files.id_data_page, fileType: 'image/jpeg' },
+        { id: 'utility_bill', url: files.utility_bill, fileType: 'image/jpeg' },
+        { id: 'nin_doc', url: files.nin_doc, fileType: 'image/jpeg' },
+        { id: 'bvn_doc', url: files.bvn_doc, fileType: 'image/jpeg' }
       ];
 
-      await compileStudentPackageClientSide(currentUser.uid, filesToCompile);
+      await generateAndUploadMandatePackage({
+        userId: currentUser.uid,
+        studentData: formData,
+        supportingDocs
+      });
 
       toast.success("Mandate package submitted successfully! Awaiting regulatory review.", { id: t });
       if (onComplete) onComplete();

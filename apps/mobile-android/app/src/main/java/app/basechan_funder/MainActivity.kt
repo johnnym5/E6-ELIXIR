@@ -313,7 +313,8 @@ class MainActivity : ComponentActivity() {
                 if (identifiedBank != targetBank) continue
 
                 // Strict Disambiguation: Filter by Bal/Balance only to avoid picking up Txn Amt
-                val balancePattern = Pattern.compile("(?:Bal|Balance|Avail\\s+Bal|Ledger\\s+Bal|New\\s+Bal)(?:\\s*:|\\s+is|\\s*-)?\\s*(?:NGN|₦)?\\s*([0-9,]+\\.[0-9]{2})", Pattern.CASE_INSENSITIVE)
+                // Synchronized with BankSmsReceiver regex
+                val balancePattern = Pattern.compile("(?:Bal|Balance|Avail\\s+Bal|Ledger\\s+Bal|New\\s+Bal)(?:\\s*:|\\s+is|\\s*-)?\\s*(?:NGN|₦|#)?\\s*([0-9,]+\\.[0-9]{2})", Pattern.CASE_INSENSITIVE)
                 val acctPattern = Pattern.compile("(?:Acct|Ac|Acc|A/c|Account)\\s*[:\\s]*[\\w\\.\\*]*(\\d{4})", Pattern.CASE_INSENSITIVE)
                 
                 val balMatcher = balancePattern.matcher(body)

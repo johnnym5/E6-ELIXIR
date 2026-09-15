@@ -25,6 +25,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { toast } from 'sonner';
+import { purgeUserClientSide } from '../utils/governanceService';
 
 interface StudentActionModalProps {
   isOpen: boolean;
@@ -105,22 +106,15 @@ export const StudentActionModal: React.FC<StudentActionModalProps> = ({
     try {
       const uid = student.userId || student.id;
 
-      // ─── CALL HARD PURGE ENDPOINT ───
-      const response = await fetch(`/api/v1/admin/users/${uid}/purge`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' }
-      });
+      // ─── DIRECT CLIENT-SIDE PURGE (BaaS Mode) ───
+      const result = await purgeUserClientSide(uid);
 
-      const text = await response.text();
-      let result: any = {};
-      try { if (text) result = JSON.parse(text); } catch (e) {}
-
-      if (response.ok || result.success) {
-        toast.success('Student permanently removed from system', { id: t });
+      if (result.success) {
+        toast.success(result.message, { id: t });
         onSuccess();
         onClose();
       } else {
-        throw new Error(result.message || "Hard purge failed on server");
+        throw new Error(result.message);
       }
     } catch (e: any) {
       console.error('Purge error:', e);

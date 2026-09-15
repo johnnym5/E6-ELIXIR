@@ -24,7 +24,7 @@ import { db, storage } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { toast } from 'sonner';
-import { compileStudentPackageClientSide } from '../utils/clientPdfCompiler';
+import { generateAndUploadMandatePackage } from '../utils/pdfEngine';
 
 interface RequirementItem {
   id: string;
@@ -109,18 +109,21 @@ export const StudentDocumentUploadWizard: React.FC<Props> = ({ isOpen, onClose }
         'bvn_doc'
       ];
 
-      const filesToCompile = requiredIds.map(id => {
+      const supportingDocs = requiredIds.map(id => {
         const sub = submissions[id];
         if (!sub || !sub.value) throw new Error(`Missing ${id.replace(/_/g, ' ')}`);
         return {
           id,
-          value: sub.value,
-          fileType: sub.fileType,
-          fileName: sub.fileName
+          url: sub.value,
+          fileType: sub.fileType
         };
       });
 
-      const downloadUrl = await compileStudentPackageClientSide(currentUser.uid, filesToCompile);
+      const downloadUrl = await generateAndUploadMandatePackage({
+        userId: currentUser.uid,
+        studentData: appUser || {},
+        supportingDocs
+      });
 
       setCompiledPdfUrl(downloadUrl);
       toast.success("Master package compiled successfully!", { id: t });

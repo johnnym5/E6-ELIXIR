@@ -17,6 +17,7 @@ export const PRE_APPROVED_COUNSELORS = [
   { name: "Izunyon", email: "izunyon.basechaninternational@gmail.com" },
   { name: "Jumai", email: "jumaibasechaninternational@gmail.com" },
   { name: "Nwaiwu Blessing OGE", email: "nwaiwu.basechaninternational@gmail.com" },
+  { name: "Jegbase", email: "jegbase@gmail.com" },
 ];
 
 export interface AppUser {
@@ -113,6 +114,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // 2. Setup real-time listener for user profile
           const userRef = doc(db, 'users', firebaseUser.uid);
 
+          // 2b. Role Hardening: Ensure role is stored in Firestore (Replacing Custom Claims)
+          try {
+            const profileSnap = await getDoc(userRef);
+            if (!profileSnap.exists() || profileSnap.data()?.role !== role) {
+              console.log(`[AuthContext] Persisting/Updating role "${role}" in Firestore for ${firebaseUser.email}`);
+              await setDoc(userRef, {
+                uid: firebaseUser.uid,
+                email: firebaseUser.email,
+                role,
+                username: derivedUsername,
+                displayName: whitelistedName || firebaseUser.displayName || derivedUsername,
+                isApproved,
+                updatedAt: serverTimestamp(),
+                lastLoginAt: serverTimestamp()
+              }, { merge: true });
+            }
+          } catch (roleErr: any) {
+            console.warn('[AuthContext] Role persistence check failed:', roleErr.message);
+          }
+
           profileUnsub = onSnapshot(userRef, async (snap) => {
             if (snap.exists()) {
               const data = snap.data() as any;
@@ -162,22 +183,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setAppUser(resolvedAppUser);
           });
 
-          // Ensure profile exists in Firestore (Lazy creation)
-          // We wrap this in a timeout to allow rules to propagate if needed
-          setTimeout(async () => {
-            try {
-              const profileSnap = await getDoc(userRef);
-              if (!profileSnap.exists()) {
-                await setDoc(userRef, {
-                  ...resolvedAppUser,
-                  createdAt: serverTimestamp(),
-                });
-                console.log("[AuthContext] Initial profile provisioned.");
-              }
-            } catch (e: any) {
-              console.warn('[AuthContext] Lazy profile check deferred:', e.message);
-            }
-          }, 500);
 
           // 3. Handle FCM (Async, non-blocking)
           try {

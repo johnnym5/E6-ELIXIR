@@ -1,54 +1,59 @@
-# Implementation Plan: FCM Push Notifications & Deep-Linking
+# Implementation Plan — Decommission `apps/server` & Move Logic to BaaS
 
-This plan outlines the integration of Firebase Cloud Messaging (FCM) for multi-platform push notifications (Android, Web) with support for interactive deep-linking and real-time UI drawer synchronization.
+This plan details the steps to migrate all backend logic from the NestJS server to the browser and Firebase (BaaS), allowing the `apps/server` module to be decommissioned.
 
 ## Proposed Changes
 
-### [Component] Backend Notification Service (apps/server)
+### 1. Browser-Side PDF Stamping & Compilation
+Refactor the PDF generation logic from the server to the client using `pdf-lib`.
 
-#### [NEW] [notificationService.ts](file:///C:/Users/HP/Documents/CODING/Basechanfunder/apps/server/src/services/notificationService.ts)
-- Implement `DeviceTokenManagementService` to handle device registration.
-- Implement `MultiChannelDispatcherEngine` to send notifications via FCM and record them in Firestore.
-
-#### [NEW] [notification.controller.ts](file:///C:/Users/HP/Documents/CODING/Basechanfunder/apps/server/src/controllers/notification.controller.ts)
-- Add `POST /api/v1/notifications/register-device` endpoint.
-
----
-
-### [Component] Web Frontend (apps/web-staff)
-
-#### [NEW] [firebase-messaging-sw.js](file:///C:/Users/HP/Documents/CODING/Basechanfunder/apps/web-staff/public/firebase-messaging-sw.js)
-- Background FCM message handler.
-- Notification click listener for deep-linking.
-
-#### [MODIFY] [AuthContext.tsx](file:///C:/Users/HP/Documents/CODING/Basechanfunder/apps/web-staff/src/context/AuthContext.tsx)
-- Add logic to request notification permission and register FCM token upon login.
-
-#### [MODIFY] [StudentMobileFirstDashboard.tsx](file:///C:/Users/HP/Documents/CODING/Basechanfunder/apps/web-staff/src/components/StudentMobileFirstDashboard.tsx)
-- Integrate real-time notification sync for the red dot and the itemized list in the "Notifications & Alerts" drawer.
+#### [NEW] [pdfEngine.ts](file:///C:/Users/HP/Documents/CODING/E6-ELIXIR/apps/web-staff/src/utils/pdfEngine.ts)
+- Implement `generateAndUploadMandatePackage` using `pdf-lib`.
+- Handle cover page generation with student data.
+- Merge uploaded images (converted to PDF pages) and PDF documents.
+- Upload the final package directly to Firebase Storage.
 
 ---
 
-### [Component] Android App (apps/mobile-android)
+### 2. Document-Based Role System
+Migrate Role-Based Access Control (RBAC) from Firebase Custom Claims to Firestore document-based roles.
 
-#### [NEW] [MyFirebaseMessagingService.kt](file:///C:/Users/HP/Documents/CODING/Basechanfunder/apps/mobile-android/app/src/main/java/app/basechan_funder/MyFirebaseMessagingService.kt)
-- Native FCM message receiver.
-- Build system notifications with deep-link Intent extras.
+#### [MODIFY] [AuthContext.tsx](file:///C:/Users/HP/Documents/CODING/E6-ELIXIR/apps/web-staff/src/context/AuthContext.tsx)
+- Update `UserRole` type and `deriveRole` logic to align with the new standard (e.g., using `ADMIN` instead of `ADMIN_GOVERNANCE` if requested, or ensuring consistent mapping).
+- Ensure the role is persisted in the `/users/{uid}` document upon login/initialization.
 
-#### [MODIFY] [AndroidManifest.xml](file:///C:/Users/HP/Documents/CODING/Basechanfunder/apps/mobile-android/app/src/main/AndroidManifest.xml)
-- Register `MyFirebaseMessagingService`.
-- Add necessary FCM permissions and meta-data.
+#### [MODIFY] [firestore.rules](file:///C:/Users/HP/Documents/CODING/E6-ELIXIR/firestore.rules)
+- Implement `getUserData()` and `isAdmin()` helper functions.
+- Restrict write access to sensitive collections (like `topup_requests` and `system_config`) based on the Firestore `role` field.
 
-#### [MODIFY] [MainActivity.kt](file:///C:/Users/HP/Documents/CODING/Basechanfunder/apps/mobile-android/app/src/main/java/app/basechan_funder/MainActivity.kt)
-- Handle deep-link Intents to navigate the WebView to the correct route.
+---
+
+### 3. Client-Side Governance Controls
+Move administrative actions (like user purging) to the client using Firebase SDK.
+
+#### [NEW] [governanceService.ts](file:///C:/Users/HP/Documents/CODING/E6-ELIXIR/apps/web-staff/src/utils/governanceService.ts)
+- Implement `purgeUserClientSide` using `writeBatch` for Firestore and `listAll`/`deleteObject` for Storage.
+- Ensure all associated data (financial accounts, notifications, etc.) is included in the cascade.
+
+---
+
+### 4. Server Decommissioning & Cleanup
+Remove all dependencies on the NestJS server.
+
+#### [MODIFY] [.env](file:///C:/Users/HP/Documents/CODING/E6-ELIXIR/.env)
+- Remove `VITE_API_BASE_URL` or any server-pointing environment variables.
+
+#### [MODIFY] [web-staff components](file:///C:/Users/HP/Documents/CODING/E6-ELIXIR/apps/web-staff/src/components)
+- Scan for and replace all `fetch` or `axios` calls pointing to `/api/v1/...` with direct calls to the new utility services or Firebase SDK.
+- Components to update include `Dashboard.tsx`, `StudentActionModal.tsx`, etc.
 
 ## Verification Plan
 
-### Automated Verification
-- Trigger simulated notifications via the backend service and verify FCM delivery.
+### Automated Tests
+- None planned for browser-side utilities at this stage.
 
 ### Manual Verification
-1.  **Device Registration**: Log in on a device and verify the FCM token is saved to the user's Firestore profile.
-2.  **Foreground Notification**: Receive a notification while the app is open and verify the red dot updates.
-3.  **Background Notification**: Send a push notification while the app is backgrounded, verify the OS banner appears.
-4.  **Deep-Linking**: Tap the notification and verify the app opens to the specified route (e.g., transaction details).
+1. **PDF Generation**: Trigger a mandate submission in the student portal. Verify the PDF is generated correctly in the browser and appears in Firebase Storage.
+2. **Role Enforcement**: Sign in as a regular student and attempt to access admin-only Firestore paths. Verify "Permission Denied" in the console.
+3. **User Purge**: Use the Admin dashboard to "Hard Purge" a test user. Verify all Firestore documents and Storage files for that UID are removed.
+4. **Server Offline**: Shut down the NestJS server (`Ctrl+C` in the server terminal) and verify the entire web application remains functional.

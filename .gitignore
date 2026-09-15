@@ -18,6 +18,8 @@ pkg/
 *.key
 service-account.json
 serviceAccountKey.json
+keystore.properties
+*.jks
 
 # IDE & System Files
 .DS_Store

@@ -2,24 +2,38 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
-    // Helper: Verify user is active or Admin
-    function isActive() {
-      let userDoc = firestore.get(/databases/(default)/documents/users/$(request.auth.uid));
-      return request.auth != null &&
-             (
-               request.auth.token.email.matches('.*@basechaninternational\\.com$') ||
-               request.auth.token.email.matches('.*\\.basechaninternational@gmail\\.com$') ||
-               userDoc.data.role in ['ADMIN_GOVERNANCE', 'COUNSELOR', 'STAFF_AUDITOR'] ||
-               (
-                 (!('isArchived' in userDoc.data) || userDoc.data.isArchived == false) &&
-                 (!('hardDeleted' in userDoc.data) || userDoc.data.hardDeleted == false)
-               )
-             );
+    // Helper: Verify user is Admin
+    function isAdmin() {
+      return request.auth != null && (
+        request.auth.token.email.matches('.*@basechaninternational\\.com$') ||
+        request.auth.token.email.matches('.*\\.basechaninternational@gmail\\.com$')
+      );
     }
 
+    // Allow authenticated users to manage their own folder
+    match /student_documents/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && (request.auth.uid == userId || isAdmin());
+    }
+
+    match /mandate_packages/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && (request.auth.uid == userId || isAdmin());
+    }
+
+    match /student_packages/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && (request.auth.uid == userId || isAdmin());
+    }
+
+    // System assets (logo, templates) - Public Read
+    match /system_assets/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Global Fallback
     match /{allPaths=**} {
-      allow read, write: if request.auth != null && isActive();
-      allow list: if request.auth != null && isActive();
+      allow read, write: if request.auth != null && isAdmin();
+      // Allow users to see their own files if not in specific folders
+      allow read: if request.auth != null;
     }
   }
 }

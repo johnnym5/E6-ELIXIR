@@ -36,8 +36,10 @@ export function resolveUserStatus(data: UserStatusData): ComplianceStatus {
   }
 
   // 1. Initial State: Newly signed up, no profile details yet
+  // If they are already approved by an admin, we treat them as awaiting setup completion
+  // but move them out of the "Incomplete Onboarding" priority bucket if needed.
   if (!data.onboardingComplete) {
-    return 'PENDING_ONBOARDING';
+    return data.isApproved ? 'AWAITING_VERIFICATION' : 'PENDING_ONBOARDING';
   }
 
   // 2. Setup Wizard Submitted, awaiting initial data match

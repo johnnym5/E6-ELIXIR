@@ -594,7 +594,8 @@ export const StudentOnboardingWizard: React.FC<Props> = ({ onComplete }) => {
 
               <div className="space-y-4">
                 <h1 className="text-4xl md:text-6xl font-black tracking-tight leading-tight uppercase">
-                  welcome to <span className="text-blue-600 dark:text-blue-400">E6 Elixir</span>
+                  welcome to <br />
+                  <span className="text-blue-600 dark:text-blue-400 whitespace-nowrap">E6 Elixir</span>
                 </h1>
                 <p className="text-lg md:text-2xl font-semibold opacity-85 max-w-lg mx-auto">
                   we make sure your <span className="text-blue-600 dark:text-blue-400 font-extrabold uppercase">PROOF OF FUNDS</span> is cleared and on track

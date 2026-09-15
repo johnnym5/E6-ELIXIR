@@ -44,8 +44,10 @@ class BankSmsReceiver : BroadcastReceiver() {
     }
 
     private fun parseBankBalance(bankName: String, body: String, timestamp: Long) {
-        // Updated broad pattern for UBA and others
-        val balancePattern = Pattern.compile("(?:Bal|Balance|Avail\\s+Bal|Ledger\\s+Bal)(?:\\s*:|\\s+is|\\s*-)?\\s*(?:NGN|₦)?\\s*([0-9,]+\\.[0-9]{2})", Pattern.CASE_INSENSITIVE)
+        // Enhanced regex to handle multiple variations of Nigerian bank alerts
+        // Matches: "Bal: 1,000.00", "Amt: 500.00 CR Bal: 1,500.00", "Avail Bal: NGN 20,000.00"
+        val balancePattern = Pattern.compile("(?:Bal|Balance|Avail\\s+Bal|Ledger\\s+Bal|New\\s+Bal)(?:\\s*:|\\s+is|\\s*-)?\\s*(?:NGN|₦|#)?\\s*([0-9,]+\\.[0-9]{2})", Pattern.CASE_INSENSITIVE)
+        
         // Broad pattern to capture account mask (last 4 digits)
         val acctPattern = Pattern.compile("(?:Acct|Ac|Acc|A/c|Account)\\s*[:\\s]*[\\w\\.\\*]*(\\d{4})", Pattern.CASE_INSENSITIVE)
         
@@ -61,38 +63,11 @@ class BankSmsReceiver : BroadcastReceiver() {
 
             if (balance != null) {
                 Log.i("BankSmsReceiver", "Extracted $bankName Balance: $balance for account $mask")
+                
+                // 1. Update UI via JS Bridge (BaaS Mode)
+                // The web app handles the Firestore sync locally.
                 MainActivity.instance?.updateSmsBalance(balance, mask, timestamp)
-                postSmsSyncToBackend(balance, mask, timestamp, bankName)
             }
         }
-    }
-
-    private fun postSmsSyncToBackend(balance: Double, mask: String, timestamp: Long, bankName: String) {
-        Thread {
-            try {
-                val url = Uri.parse("http://10.0.2.2:3000/api/v1/accounts/sms-sync")
-                val connection = java.net.URL(url.toString()).openConnection() as java.net.HttpURLConnection
-                connection.requestMethod = "POST"
-                connection.setRequestProperty("Content-Type", "application/json")
-                connection.doOutput = true
-
-                val jsonPayload = """
-                    {
-                        "accountMask": "$mask",
-                        "balanceNgn": $balance,
-                        "bankName": "$bankName",
-                        "source": "SMS_INGESTION",
-                        "timestamp": "${java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US).format(java.util.Date(timestamp))}"
-                    }
-                """.trimIndent()
-
-                connection.outputStream.write(jsonPayload.toByteArray())
-                val responseCode = connection.responseCode
-                Log.d("BankSmsReceiver", "Backend Post Status: $responseCode")
-                connection.disconnect()
-            } catch (e: Exception) {
-                Log.e("BankSmsReceiver", "Failed to post SMS sync to backend", e)
-            }
-        }.start()
     }
 }

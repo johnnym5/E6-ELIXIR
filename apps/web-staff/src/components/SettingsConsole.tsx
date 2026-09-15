@@ -49,6 +49,7 @@ import { FirestoreDatabaseExplorer } from './FirestoreDatabaseExplorer';
 import { StorageExplorer } from './StorageExplorer';
 import { IncidentEngine, SystemIncident } from '../services/incidentEngine';
 import { toast } from 'sonner';
+import { seedRequirementsClientSide } from '../utils/governanceService';
 
 import { MAJOR_CURRENCIES } from '../constants';
 
@@ -483,6 +484,21 @@ export const SettingsConsole: React.FC<{ initialTab?: SettingTab }> = ({ initial
                 <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Configure master checklist for all student evaluations</p>
               </div>
               <div className="flex gap-3">
+                <button
+                  onClick={async () => {
+                    const t = toast.loading('Seeding global requirements...');
+                    try {
+                      await seedRequirementsClientSide();
+                      toast.success('Requirements seeded successfully', { id: t });
+                    } catch (e: any) {
+                      toast.error('Seeding failed: ' + e.message, { id: t });
+                    }
+                  }}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-[10px] font-black uppercase tracking-widest border border-white/5 hover:bg-slate-700 transition-all active:scale-95"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  <span>Seed Defaults</span>
+                </button>
                 <button
                   onClick={() => { setEditingRequirement(null); setIsRequirementModalOpen(true); }}
                   className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest shadow-xl shadow-blue-500/20 hover:bg-blue-500 transition-all active:scale-95"

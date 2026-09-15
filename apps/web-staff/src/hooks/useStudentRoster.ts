@@ -202,8 +202,14 @@ export function useStudentRoster() {
       // Skip archived or deleted users
       if (u.isArchived === true || u.hardDeleted === true) return;
 
-      const isAlreadyIn = merged.some(s => s.userId === uid || s.email === u.email);
-      const isStudentRole = u.role === 'STUDENT' || (!u.email?.endsWith('@basechaninternational.com') && !u.email?.endsWith('.basechaninternational@gmail.com'));
+      // A user is a student if they have the STUDENT role, OR if they have NO role assigned yet
+      // but their email doesn't match the company domain.
+      // Crucially, if they have an ADMIN or COUNSELOR role, they are NOT a student.
+      const userRole = u.role || 'STUDENT';
+      const isStaffRole = ['ADMIN_GOVERNANCE', 'COUNSELOR', 'STAFF_AUDITOR', 'ADMIN'].includes(userRole);
+      const isCompanyEmail = u.email?.endsWith('@basechaninternational.com') || u.email?.endsWith('.basechaninternational@gmail.com');
+
+      const isStudentRole = !isStaffRole && (userRole === 'STUDENT' || !isCompanyEmail);
 
       if (!isAlreadyIn && isStudentRole) {
         const isTopUpPending = u.status === 'TOPUP_PENDING' || u.topUpStatus === 'REQUEST_PENDING' || u.hasPendingTopUp === true;

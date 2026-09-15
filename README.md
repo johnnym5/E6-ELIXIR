@@ -1,7 +1,7 @@
 # 🛡️ E6 Elixir — Proof of Funds & Compliance Portal
 
 <p align="center">
-  <img src="apps/web-staff/public/logo_new.png" alt="E6 Elixir Logo" width="160" />
+  <img src="apps/web-staff/public/logo_white.png" alt="E6 Elixir Logo" width="220" />
 </p>
 
 ## 📖 Overview
