@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { modalBackdropVariants, drawerVariants } from '../utils/motionPresets';
 import {
   X as XIcon, User, Globe, CreditCard, Save, Loader2, TrendingUp, Sliders, Activity,
   Clock, History, ShieldAlert, ChevronRight, Zap, FileText, Trash2, Edit3, ShieldCheck,
-  Layers, Settings, X, CheckCircle2, Target
+  Layers, Settings, X, CheckCircle2, Target, CheckCheck
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -14,7 +14,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { toast } from 'sonner';
-import { LIVE_FX_RATE } from '../constants';
+import { LIVE_FX_RATE, MAJOR_CURRENCIES } from '../constants';
 import { resolveCountryCurrency, getCurrencyCode } from '../utils/currencyResolver';
 import { convertCurrency } from '../utils/exchangeRateEngine';
 
@@ -444,7 +444,7 @@ export const AdminStudentProfileDrawer: React.FC<AdminStudentProfileDrawerProps>
             {/* Header */}
             <div className="p-6 border-b border-slate-200 dark:border-zinc-800 flex justify-between items-center sticky top-0 z-20 backdrop-blur-xl bg-slate-900/40">
               <div>
-                <h3 className="text-xl font-black uppercase tracking-tight text-white">Governance Review</h3>
+                <h3 className="text-xl font-black uppercase tracking-tight text-white">Top-Up Settings Review</h3>
                 <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mt-0.5">Config: {student.name}</p>
               </div>
               <button onClick={onClose} className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 transition-all"><XIcon className="w-5 h-5" /></button>
@@ -454,7 +454,7 @@ export const AdminStudentProfileDrawer: React.FC<AdminStudentProfileDrawerProps>
             <div className="flex px-6 pt-6 gap-2 flex-wrap shrink-0">
               {[
                 { id: 'profile', label: 'Profile', icon: User },
-                { id: 'governance', label: 'Governance', icon: Settings },
+                { id: 'governance', label: 'Top Up Settings', icon: Settings },
                 { id: 'documents', label: 'Docs', icon: FileText },
                 { id: 'activity', label: 'Logs', icon: History }
               ].map(tab => (
