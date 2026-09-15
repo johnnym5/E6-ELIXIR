@@ -110,7 +110,7 @@ export const AuthPage: React.FC = () => {
           console.log("Native Credential synced with Firebase Auth.");
         } catch (err: any) {
           console.error("Native Credential sync failed:", err);
-          setError(friendly(err as AuthError));
+          setError(`Google Sign-In failed: The ID Token was rejected by the e6elixir Firebase project. Ensure the Web Client ID in MainActivity.kt matches your active e6elixir project, and your local debug/release SHA-1 fingerprint is added to your Firebase Console settings.`);
           setGoogleLoading(false);
         }
       };
