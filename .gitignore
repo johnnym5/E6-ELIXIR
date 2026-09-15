@@ -21,6 +21,10 @@ serviceAccountKey.json
 keystore.properties
 *.jks
 
+# Isolated Build Directories
+.gradle_home/
+.android_home/
+
 # IDE & System Files
 .DS_Store
 Thumbs.db

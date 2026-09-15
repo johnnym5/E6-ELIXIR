@@ -70,14 +70,14 @@ E6 Elixir/
 *   Android Studio (for mobile development)
 
 ### Local Development
-1.  **Clone the repository**: `git clone https://github.com/basechanfunder/basechan-funder`
+1.  **Clone the repository**: `git clone https://github.com/johnnym5/E6-ELIXIR`
 2.  **Install dependencies**: `npm install`
 3.  **Start the Dashboard**: `npm run dev`
 4.  **Access the Portal**: Open `https://localhost:3001` (Accept the HTTPS certificate).
 
 ### Android Testing
 Download the latest development build directly to your emulator or physical device:
-👉 **[📲 Download E6 Elixir APK](https://github.com/johnnym5/basechanfunder/raw/main/apps/mobile-android/app/build/outputs/apk/debug/app-debug.apk)**
+👉 **[📲 Download E6 Elixir APK](https://github.com/johnnym5/E6-ELIXIR/raw/main/apps/mobile-android/app/build/outputs/apk/debug/app-debug.apk)**
 
 ---
 

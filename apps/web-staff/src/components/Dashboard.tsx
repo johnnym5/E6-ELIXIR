@@ -410,7 +410,8 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({ onInspect, onMes
       // Sync details from users collection if available
       const userProfile = allUsers.find(u => u.uid === s.userId || u.email === s.email);
       const isApproved = userProfile ? (userProfile.isApproved === true && userProfile.hardDeleted !== true) : s.isApproved;
-      const name = s.name === 'Unknown Student' && userProfile ? (userProfile.displayName || userProfile.username || s.name) : s.name;
+      const name = userProfile?.displayName || userProfile?.username || s.name;
+      const email = userProfile?.email || s.email;
 
       // New data fields for filtering
       const phoneNumber = userProfile?.phoneNumber || '';
@@ -440,6 +441,7 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({ onInspect, onMes
       return {
         ...s,
         name,
+        email,
         isApproved,
         status: finalStatus,
         topUpStatus: userProfile?.topUpStatus,
