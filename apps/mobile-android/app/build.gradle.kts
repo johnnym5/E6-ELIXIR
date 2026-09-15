@@ -28,7 +28,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "app.basechan_funder"
+        applicationId = "com.basechaninternational.e6elixir"
         minSdk = 24
         targetSdk = 34
         versionCode = 1

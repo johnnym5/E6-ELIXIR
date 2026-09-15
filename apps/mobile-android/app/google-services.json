@@ -1,49 +1,33 @@
 {
   "project_info": {
-    "project_number": "1053228569213",
-    "project_id": "basechanfunder",
-    "storage_bucket": "basechanfunder.firebasestorage.app"
+    "project_number": "73436010834",
+    "project_id": "e6elixir",
+    "storage_bucket": "e6elixir.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:1053228569213:android:88fbd2ca406bec3d9e5714",
+        "mobilesdk_app_id": "1:73436010834:android:9591b96cd9f4028590028b",
         "android_client_info": {
-          "package_name": "app.basechan_funder"
+          "package_name": "com.basechaninternational.e6elixir"
         }
       },
       "oauth_client": [
         {
-          "client_id": "1053228569213-3p1077kk67pk3r3d08ddv4o5g8reb7a3.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "app.basechan_funder",
-            "certificate_hash": "059ac9bb82b5e6ba7a4b1387c66f7ade0f75f1f3"
-          }
-        },
-        {
-          "client_id": "1053228569213-8rh7use9jnppajlcgvdm1ibjthnn4ldq.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "app.basechan_funder",
-            "certificate_hash": "4181e88b5a2ceeb0ff86b73ee41055a7086da21d"
-          }
-        },
-        {
-          "client_id": "1053228569213-gmqs7gromujm3esbd190klhd9rbm1grb.apps.googleusercontent.com",
+          "client_id": "73436010834-6rk3otabhi48up337vf4b458thm3kbtt.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyA9qSW8On8uHZCrWAp35r4PRa9zNdEkCLk"
+          "current_key": "AIzaSyA0lK4F70-5UxMS_PCdGvcd1HdN9K4K9QA"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "1053228569213-gmqs7gromujm3esbd190klhd9rbm1grb.apps.googleusercontent.com",
+              "client_id": "73436010834-6rk3otabhi48up337vf4b458thm3kbtt.apps.googleusercontent.com",
               "client_type": 3
             }
           ]
