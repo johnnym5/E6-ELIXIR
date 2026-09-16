@@ -38,47 +38,94 @@ service cloud.firestore {
 
     // ── Financial Accounts ──
     match /financial_accounts/{docId} {
-      allow read, write: if request.auth != null && (
-        resource.data.userId == request.auth.uid ||
+      allow read: if request.auth != null && (
+        (resource != null && resource.data.userId == request.auth.uid) ||
         isAdmin() ||
         isStaff()
       );
+      allow create: if request.auth != null && (
+        request.resource.data.userId == request.auth.uid ||
+        isAdmin() ||
+        isStaff()
+      );
+      allow update, delete: if request.auth != null && (
+        (resource != null && resource.data.userId == request.auth.uid) ||
+        isAdmin() ||
+        isStaff()
+      );
+
+      match /transactions/{tId} {
+        allow read, write: if request.auth != null && (
+          (get(/databases/$(database)/documents/financial_accounts/$(docId)).data.userId == request.auth.uid) ||
+          isAdmin() ||
+          isStaff()
+        );
+      }
     }
 
     // ── PoF Evaluations ──
     match /pof_evaluations/{docId} {
-      allow read, write: if request.auth != null && (
-        resource.data.userId == request.auth.uid ||
+      allow read: if request.auth != null && (
+        (resource != null && resource.data.userId == request.auth.uid) ||
+        isAdmin() ||
+        isStaff()
+      );
+      allow write: if request.auth != null && (
+        (request.resource != null && request.resource.data.userId == request.auth.uid) ||
+        (resource != null && resource.data.userId == request.auth.uid) ||
         isAdmin() ||
         isStaff()
       );
     }
 
-    // ── Top-Up Requests ──
-    match /topup_requests/{docId} {
+    // ── Liquidity & Top-Up Requests ──
+    match /liquidity_requests/{docId} {
       allow read: if request.auth != null && (
-        resource.data.userId == request.auth.uid ||
+        (resource != null && resource.data.userId == request.auth.uid) ||
         isAdmin() ||
         isStaff()
       );
-      allow create: if request.auth != null;
+      allow create: if request.auth != null && (
+        request.resource.data.userId == request.auth.uid ||
+        isAdmin() ||
+        isStaff()
+      );
+      allow update, delete: if isAdmin() || isStaff();
+    }
+
+    match /topup_requests/{docId} {
+      allow read: if request.auth != null && (
+        (resource != null && resource.data.userId == request.auth.uid) ||
+        isAdmin() ||
+        isStaff()
+      );
+      allow create: if request.auth != null && (
+        request.resource.data.userId == request.auth.uid ||
+        isAdmin() ||
+        isStaff()
+      );
       allow update, delete: if isAdmin() || isStaff();
     }
 
     // ── Notifications ──
     match /notifications/{docId} {
       allow read: if request.auth != null && (
-        resource.data.userId == request.auth.uid ||
+        (resource != null && resource.data.userId == request.auth.uid) ||
         isAdmin() ||
         isStaff()
       );
-      allow write: if isAdmin() || isStaff();
+      allow create: if request.auth != null && (
+        request.resource.data.userId == request.auth.uid ||
+        isAdmin() ||
+        isStaff()
+      );
+      allow update, delete: if isAdmin() || isStaff();
     }
 
     // ── Audit Logs ──
     match /audit_logs/{docId} {
       allow read: if request.auth != null && (
-        resource.data.studentId == request.auth.uid ||
+        (resource != null && resource.data.studentId == request.auth.uid) ||
         isAdmin() ||
         isStaff()
       );
@@ -89,22 +136,27 @@ service cloud.firestore {
     // ── Manual Adjustments ──
     match /manual_adjustments/{docId} {
       allow read: if request.auth != null && (
-        resource.data.studentId == request.auth.uid ||
+        (resource != null && resource.data.studentId == request.auth.uid) ||
         isAdmin() ||
         isStaff()
       );
       allow write: if isAdmin() || isStaff();
     }
 
-    // ── Support Tickets ──
+    // ── Support Tickets & Messages ──
     match /support_tickets/{docId} {
       allow read: if request.auth != null && (
-        resource.data.userId == request.auth.uid ||
+        (resource != null && resource.data.userId == request.auth.uid) ||
         isAdmin() ||
         isStaff()
       );
       allow create: if request.auth != null;
       allow update, delete: if isAdmin() || isStaff();
+    }
+
+    match /support_messages/{docId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
     }
 
     // ── System Configuration ──

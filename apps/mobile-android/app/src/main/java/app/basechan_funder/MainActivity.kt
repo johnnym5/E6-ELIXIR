@@ -171,10 +171,13 @@ class MainActivity : ComponentActivity() {
         settings.allowFileAccessFromFileURLs = true
         settings.allowUniversalAccessFromFileURLs = true
 
-        // Register the JS Bridge
+        // register the JS Bridge
         webView.addJavascriptInterface(AndroidInterface(), "AndroidBridge")
 
         setContentView(webView)
+
+        // Request necessary permissions on launch
+        requestNecessaryPermissions()
         
         // Handle deep link from intent extras if present
         val deepLink = intent.getStringExtra("deepLinkRoute")
@@ -185,6 +188,25 @@ class MainActivity : ComponentActivity() {
         }
         
         webView.loadUrl(finalUrl)
+    }
+
+    private fun requestNecessaryPermissions() {
+        val permissions = mutableListOf<String>()
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
+            permissions.add(Manifest.permission.READ_SMS)
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECEIVE_SMS) != PackageManager.PERMISSION_GRANTED) {
+            permissions.add(Manifest.permission.RECEIVE_SMS)
+        }
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                permissions.add(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+        
+        if (permissions.isNotEmpty()) {
+            ActivityCompat.requestPermissions(this, permissions.toTypedArray(), 100)
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
