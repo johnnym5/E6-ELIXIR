@@ -56,6 +56,13 @@ export function resolveUserStatus(data: UserStatusData): ComplianceStatus {
     return 'WAITING_APPROVAL';
   }
 
+  // 4b. Approved but status still at default initialization
+  // If a student is approved, they are by definition no longer "Unauthenticated"
+  // unless a specific verification failure flag is set.
+  if (data.status === 'UNAUTHENTICATED' && !data.verificationFailed) {
+    return 'PENDING';
+  }
+
   // 5. Mature / Validated States
   // A student is only CLEARED if they are approved AND meet the financial target/days OR are explicitly cleared by admin
   const isExplicitlyCleared = data.status === 'VALIDATED' || data.status === 'CLEARED';

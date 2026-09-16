@@ -1,4 +1,6 @@
 import java.util.Properties
+import java.text.SimpleDateFormat
+import java.util.Date
 
 plugins {
   alias(libs.plugins.android.application)
@@ -27,12 +29,15 @@ android {
         }
     }
 
+    val versionDate = SimpleDateFormat("dd.MM.yy.HHmm").format(Date())
+    val vCode = (System.currentTimeMillis() / 60000).toInt()
+
     defaultConfig {
         applicationId = "com.basechaninternational.e6elixir"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = vCode
+        versionName = versionDate
     }
 
     buildTypes {
