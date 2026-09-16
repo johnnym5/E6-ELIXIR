@@ -143,30 +143,28 @@ export function useStudentRoster() {
   const liveStudents = useMemo(() => {
     const LIVE_FX = LIVE_FX_RATE;
 
-    const merged: Student[] = evaluations.filter(s => {
-      const userProfile = allUsers.find(u => u.uid === s.userId || u.email === s.email);
-      // Filter out hard deleted OR archived users
-      if (userProfile?.hardDeleted || userProfile?.isArchived === true) return false;
-      return true;
-    }).map(s => {
-      const studentAccs = accounts.filter(a => a.userId === s.userId || a.userEmail === s.email);
+    // Use a Map for O(1) deduplication. Key = normalized email or userId.
+    const studentsMap = new Map<string, Student>();
+
+    // 1. Process evaluations first (they hold compliance progress)
+    // Sort to prefer those with actual progress/targets if duplicates exist
+    const sortedEvals = [...evaluations].sort((a, b) => (b.targetGbp || 0) - (a.targetGbp || 0));
+
+    sortedEvals.forEach(s => {
+      const emailKey = s.email?.toLowerCase().trim();
+      const idKey = s.userId;
+
+      // Filter out hard deleted or archived users by checking against allUsers
+      const userProfile = allUsers.find(u => u.uid === s.userId || (emailKey && u.email?.toLowerCase() === emailKey));
+      if (userProfile?.hardDeleted || userProfile?.isArchived === true) return;
+
+      const studentAccs = accounts.filter(a => a.userId === s.userId || (emailKey && a.userEmail?.toLowerCase() === emailKey));
       const accountsTotalGbp = studentAccs.reduce((sum, curr) =>
         sum + (Number(curr.balanceGbp) || Number(curr.balanceGBP) || 0), 0
       );
       const manualTotalGbp = ((s as any).currentBalanceNgn || 0) / LIVE_FX;
       const totalGbp = accountsTotalGbp + manualTotalGbp;
-      const studentRequest = requests.find(r => r.userId === s.userId || r.userEmail === s.email);
-
-      let userProfile = allUsers.find(u => u.uid === s.userId || (s.email && u.email === s.email));
-
-      // FALLBACK: If still no profile found (common for manual entries with missing emails),
-      // try to find a registered user with the EXACT same name.
-      if (!userProfile && s.name && s.name !== 'Unknown Student') {
-        userProfile = allUsers.find(u =>
-          (u.displayName?.toLowerCase() === s.name.toLowerCase() || u.username?.toLowerCase() === s.name.toLowerCase()) &&
-          u.role === 'STUDENT'
-        );
-      }
+      const studentRequest = requests.find(r => r.userId === s.userId || (emailKey && r.userEmail?.toLowerCase() === emailKey));
 
       const isApproved = userProfile ? (userProfile.isApproved === true && userProfile.hardDeleted !== true) : s.isApproved;
       const name = s.name === 'Unknown Student' && userProfile ? (userProfile.displayName || userProfile.username || s.name) : s.name;
@@ -196,7 +194,7 @@ export function useStudentRoster() {
         verificationFailed: userProfile?.verificationFailed
       });
 
-      return {
+      const studentObj: Student = {
         ...s,
         name,
         email,
@@ -214,66 +212,74 @@ export function useStudentRoster() {
         ingestionChannels,
         counselorName: s.counselorName || 'Unassigned'
       };
+
+      // Set in map using email as primary key, fallback to userId
+      if (emailKey) studentsMap.set(emailKey, studentObj);
+      else if (idKey) studentsMap.set(idKey, studentObj);
     });
 
-    // Add users not in pof_evaluations yet
+    // 2. Add users not in evaluations yet
     allUsers.forEach(u => {
       const uid = u.id || u.uid;
-      // Skip archived or deleted users
+      const emailKey = u.email?.toLowerCase().trim();
+
+      // Skip archived, deleted or non-students
       if (u.isArchived === true || u.hardDeleted === true) return;
 
-      // A user is a student if they have the STUDENT role, OR if they have NO role assigned yet
-      // but their email doesn't match the company domain.
-      // Crucially, if they have an ADMIN or COUNSELOR role, they are NOT a student.
       const userRole = u.role || 'STUDENT';
       const isStaffRole = ['ADMIN_GOVERNANCE', 'COUNSELOR', 'STAFF_AUDITOR', 'ADMIN'].includes(userRole);
       const isCompanyEmail = u.email?.endsWith('@basechaninternational.com') || u.email?.endsWith('.basechaninternational@gmail.com');
-
       const isStudentRole = !isStaffRole && (userRole === 'STUDENT' || !isCompanyEmail);
 
-      if (!isAlreadyIn && isStudentRole) {
-        const isTopUpPending = u.status === 'TOPUP_PENDING' || u.topUpStatus === 'REQUEST_PENDING' || u.hasPendingTopUp === true;
-        const isApproved = u.isApproved === true && u.hardDeleted !== true;
-        const onboardingComplete = !!u.onboardingComplete || !!u.setupCompleted || isTopUpPending;
-        
-        const status = isTopUpPending ? 'TOPUP_PENDING' : resolveUserStatus({
-          isApproved,
-          onboardingComplete,
-          verificationFailed: u.verificationFailed,
-          status: u.status,
-          targetGbp: u.onboardingProfile?.targetGbp || 0
-        });
+      if (!isStudentRole) return;
 
-        merged.push({
-          id: uid,
-          userId: uid,
-          name: u.displayName || u.username || 'New User',
-          email: u.email || '',
-          phoneNumber: u.phoneNumber || '',
-          accountNumbers: [],
-          parallexAccountNumbers: [u.onboardingProfile?.parallexAccountNumber].filter(Boolean),
-          status,
-          topUpStatus: u.topUpStatus,
-          hasPendingTopUp: u.hasPendingTopUp || isTopUpPending,
-          setupCompleted: u.setupCompleted,
-          isApproved,
-          consecutiveDays: 0,
-          balanceGbp: 0,
-          targetGbp: 0,
-          anomalyRatio: 0,
-          lastUpdate: isTopUpPending ? 'Top-Up Requested' : 'Awaiting Setup',
-          createdAt: u.createdAt?.seconds ? new Date(u.createdAt.seconds * 1000).toISOString() : new Date().toISOString(),
-          isNew: true,
-          expirationDate: null,
-          timerCustomMessage: null,
-          isTimerActive: false,
-          ingestionChannels: ['UNVERIFIED'],
-          destinationCountry: u.onboardingProfile?.destinationCountry || ''
-        });
-      }
+      // Only add if NOT already in the map (from evaluations)
+      if ((emailKey && studentsMap.has(emailKey)) || (uid && studentsMap.has(uid))) return;
+
+      const isTopUpPending = u.status === 'TOPUP_PENDING' || u.topUpStatus === 'REQUEST_PENDING' || u.hasPendingTopUp === true;
+      const isApproved = u.isApproved === true && u.hardDeleted !== true;
+      const onboardingComplete = !!u.onboardingComplete || !!u.setupCompleted || isTopUpPending;
+
+      const status = isTopUpPending ? 'TOPUP_PENDING' : resolveUserStatus({
+        isApproved,
+        onboardingComplete,
+        verificationFailed: u.verificationFailed,
+        status: u.status,
+        targetGbp: u.onboardingProfile?.targetGbp || 0
+      });
+
+      const studentObj: Student = {
+        id: uid,
+        userId: uid,
+        name: u.displayName || u.username || 'New User',
+        email: u.email || '',
+        phoneNumber: u.phoneNumber || '',
+        accountNumbers: [],
+        parallexAccountNumbers: [u.onboardingProfile?.parallexAccountNumber].filter(Boolean),
+        status,
+        topUpStatus: u.topUpStatus,
+        hasPendingTopUp: u.hasPendingTopUp || isTopUpPending,
+        setupCompleted: u.setupCompleted,
+        isApproved,
+        consecutiveDays: 0,
+        balanceGbp: 0,
+        targetGbp: 0,
+        anomalyRatio: 0,
+        lastUpdate: isTopUpPending ? 'Top-Up Requested' : 'Awaiting Setup',
+        createdAt: u.createdAt?.seconds ? new Date(u.createdAt.seconds * 1000).toISOString() : new Date().toISOString(),
+        isNew: true,
+        expirationDate: null,
+        timerCustomMessage: null,
+        isTimerActive: false,
+        ingestionChannels: ['UNVERIFIED'],
+        destinationCountry: u.onboardingProfile?.destinationCountry || ''
+      };
+
+      if (emailKey) studentsMap.set(emailKey, studentObj);
+      else if (uid) studentsMap.set(uid, studentObj);
     });
 
-    return merged;
+    return Array.from(studentsMap.values());
   }, [evaluations, accounts, requests, allUsers]);
 
   // Metric Stats

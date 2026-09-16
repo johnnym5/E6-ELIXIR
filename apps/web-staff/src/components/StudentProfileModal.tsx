@@ -7,7 +7,7 @@ import {
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
-import { doc, updateDoc, serverTimestamp, setDoc, query, collection, where, getDocs, onSnapshot, orderBy, limit } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp, setDoc, query, collection, where, getDocs, onSnapshot, orderBy, limit, writeBatch } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { executeSoftReset } from '../utils/softResetService';
 import { purgeUserClientSide } from '../utils/governanceService';
@@ -68,7 +68,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
   const { theme } = useTheme();
   const { role } = useAuth();
   const isDark = theme === 'dark';
-  const isAdmin = role === 'ADMIN_GOVERNANCE';
+  const isAdmin = role === 'ADMIN_GOVERNANCE' || role === 'ADMIN';
 
   const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'TOPUP_CONFIG' | 'REQUESTS_HISTORY'>('OVERVIEW');
   const [userProfile, setUserProfile] = useState(initialUserProfile);
@@ -181,6 +181,35 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
       toast.success('Governance parameters updated');
     } catch (e: any) {
       toast.error('Update failed: ' + e.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleStopEvaluation = async () => {
+    if (!userProfile?.uid) return;
+    if (!window.confirm(`Are you sure you want to STOP the evaluation for ${userProfile.displayName}? This will remove them from the tracking roster but their account remains active.`)) return;
+
+    setIsSubmitting(true);
+    try {
+      const evalQ = query(collection(db, 'pof_evaluations'), where('userId', '==', userProfile.uid));
+      const evalSnap = await getDocs(evalQ);
+      const batch = writeBatch(db);
+
+      evalSnap.forEach(d => batch.delete(d.ref));
+
+      // Also check by email if it's a manual STU- entry
+      if (userProfile.email) {
+        const evalEQ = query(collection(db, 'pof_evaluations'), where('userEmail', '==', userProfile.email.toLowerCase().trim()));
+        const evalESnap = await getDocs(evalEQ);
+        evalESnap.forEach(d => batch.delete(d.ref));
+      }
+
+      await batch.commit();
+      toast.success('Student removed from active tracking roster');
+      onClose();
+    } catch (e: any) {
+      toast.error('Operation failed: ' + e.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -392,9 +421,16 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                 </div>
 
                 {isAdmin && (
-                  <div className="flex gap-4 pt-4">
-                    <button onClick={handleSoftReset} className="flex-1 py-4 rounded-2xl border border-amber-500/30 text-amber-500 text-[10px] font-black uppercase tracking-widest hover:bg-amber-500/10 transition-all flex items-center justify-center gap-2"><RefreshCw className="w-4 h-4" /> Soft Reset Data</button>
-                    <button onClick={handleHardDelete} className="flex-1 py-4 rounded-2xl bg-rose-600 text-white text-[10px] font-black uppercase tracking-widest shadow-lg hover:bg-rose-700 transition-all flex items-center justify-center gap-2"><Trash2 className="w-4 h-4" /> Purge User Account</button>
+                  <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t border-white/5 mt-8">
+                    <button onClick={handleStopEvaluation} className="flex-1 py-4 rounded-2xl border border-blue-500/30 text-blue-400 text-[10px] font-black uppercase tracking-widest hover:bg-blue-500/10 transition-all flex items-center justify-center gap-2">
+                      <History className="w-4 h-4" /> Stop Evaluation
+                    </button>
+                    <button onClick={handleSoftReset} className="flex-1 py-4 rounded-2xl border border-amber-500/30 text-amber-500 text-[10px] font-black uppercase tracking-widest hover:bg-amber-500/10 transition-all flex items-center justify-center gap-2">
+                      <RefreshCw className="w-4 h-4" /> Soft Reset Data
+                    </button>
+                    <button onClick={handleHardDelete} className="flex-1 py-4 rounded-2xl bg-rose-600 text-white text-[10px] font-black uppercase tracking-widest shadow-lg hover:bg-rose-700 transition-all flex items-center justify-center gap-2">
+                      <Trash2 className="w-4 h-4" /> Purge Account
+                    </button>
                   </div>
                 )}
               </div>

@@ -2,30 +2,33 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper: Fetch user data from the Firestore document
-    function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    // Helper: Safely fetch user role
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
     }
 
-    // Helper: Check if requester is Admin (By Email or Firestore Role)
+    // Helper: Check if requester is Admin
     function isAdmin() {
       return request.auth != null && (
-        request.auth.token.email.matches('.*@basechaninternational\\.com$') ||
-        request.auth.token.email.matches('.*\\.basechaninternational@gmail\\.com$') ||
+        (request.auth.token.email != null && request.auth.token.email.matches('.*@basechaninternational\\.com$')) ||
+        (request.auth.token.email != null && request.auth.token.email.matches('.*\\.basechaninternational@gmail\\.com$')) ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-         getUserData().role in ['ADMIN', 'ADMIN_GOVERNANCE'])
+         getUserRole() in ['ADMIN', 'ADMIN_GOVERNANCE'])
       );
     }
 
+    // Helper: Check if requester is Staff (Counselor or Auditor)
     function isStaff() {
-       return request.auth != null && (isAdmin() || getUserData().role in ['COUNSELOR', 'STAFF_AUDITOR']);
+       return request.auth != null && (
+         isAdmin() ||
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          getUserRole() in ['COUNSELOR', 'STAFF_AUDITOR'])
+       );
     }
 
     // ── Users Collection ──
     match /users/{userId} {
       allow read: if true;
-
-      // Users can write their own profile, Admins can write any
       allow write: if request.auth != null && (request.auth.uid == userId || isAdmin());
 
       match /{allPaths=**} {
@@ -33,18 +36,75 @@ service cloud.firestore {
       }
     }
 
-    // ── Financial Accounts & Ledgers ──
+    // ── Financial Accounts ──
     match /financial_accounts/{docId} {
-      allow read, write: if request.auth != null && (resource.data.userId == request.auth.uid || isAdmin() || isStaff());
+      allow read, write: if request.auth != null && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin() ||
+        isStaff()
+      );
     }
 
+    // ── PoF Evaluations ──
     match /pof_evaluations/{docId} {
-      allow read, write: if request.auth != null && (resource.data.userId == request.auth.uid || isAdmin() || isStaff());
+      allow read, write: if request.auth != null && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin() ||
+        isStaff()
+      );
     }
 
+    // ── Top-Up Requests ──
     match /topup_requests/{docId} {
-      allow read, create: if request.auth != null;
+      allow read: if request.auth != null && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin() ||
+        isStaff()
+      );
+      allow create: if request.auth != null;
+      allow update, delete: if isAdmin() || isStaff();
+    }
+
+    // ── Notifications ──
+    match /notifications/{docId} {
+      allow read: if request.auth != null && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin() ||
+        isStaff()
+      );
+      allow write: if isAdmin() || isStaff();
+    }
+
+    // ── Audit Logs ──
+    match /audit_logs/{docId} {
+      allow read: if request.auth != null && (
+        resource.data.studentId == request.auth.uid ||
+        isAdmin() ||
+        isStaff()
+      );
+      allow create: if request.auth != null;
       allow update, delete: if isAdmin();
+    }
+
+    // ── Manual Adjustments ──
+    match /manual_adjustments/{docId} {
+      allow read: if request.auth != null && (
+        resource.data.studentId == request.auth.uid ||
+        isAdmin() ||
+        isStaff()
+      );
+      allow write: if isAdmin() || isStaff();
+    }
+
+    // ── Support Tickets ──
+    match /support_tickets/{docId} {
+      allow read: if request.auth != null && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin() ||
+        isStaff()
+      );
+      allow create: if request.auth != null;
+      allow update, delete: if isAdmin() || isStaff();
     }
 
     // ── System Configuration ──
@@ -53,14 +113,18 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // ── Fallback for all other collections ──
+    // ── Fallback ──
     match /{collectionId}/{docId} {
-      allow read, write: if request.auth != null && (
+      allow read: if request.auth != null && (
         isAdmin() ||
         isStaff() ||
-        (request.method == 'create') ||
-        (resource != null && resource.data.userId == request.auth.uid)
+        (resource != null && (
+          resource.data.userId == request.auth.uid ||
+          resource.data.studentId == request.auth.uid ||
+          resource.data.uid == request.auth.uid
+        ))
       );
+      allow write: if request.auth != null && (isAdmin() || isStaff());
     }
   }
 }

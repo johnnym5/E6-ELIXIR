@@ -38,6 +38,8 @@ export const useUserBalance = (userId: string | undefined) => {
           lastSyncedAt: data.lastSyncedAt
         });
       }
+    }, (err) => {
+      console.error("[useUserBalance] User profile stream error:", err);
     });
 
     // 2. Financial Accounts Listener (Top-Level Collection)
@@ -46,6 +48,8 @@ export const useUserBalance = (userId: string | undefined) => {
     const unsubAccounts = onSnapshot(q, (snap) => {
       const accData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       setAccounts(accData);
+    }, (err) => {
+      console.error("[useUserBalance] Accounts stream error:", err);
     });
 
     // 3. PoF Evaluation Listener
@@ -56,7 +60,7 @@ export const useUserBalance = (userId: string | undefined) => {
       }
       setLoading(false);
     }, (err) => {
-      console.error("useUserBalance evaluation error:", err);
+      console.error("[useUserBalance] Evaluation stream error:", err);
       setLoading(false);
     });
 

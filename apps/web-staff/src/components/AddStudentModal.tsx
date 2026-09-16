@@ -21,6 +21,7 @@ import {
   limit
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import { toast } from 'sonner';
 
 interface AddStudentModalProps {
   isOpen: boolean;
@@ -102,6 +103,16 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({ isOpen, onClos
   const handleAddRegistered = async (user: any) => {
     setIsSaving(true);
     try {
+      // 1. Check for existing evaluation to prevent duplication
+      const q = query(collection(db, 'pof_evaluations'), where('userId', '==', user.id));
+      const existing = await getDocs(q);
+
+      if (!existing.empty) {
+        toast.error('This student already has an active evaluation profile.');
+        setIsSaving(false);
+        return;
+      }
+
       await addDoc(collection(db, 'pof_evaluations'), {
         userId: user.id,
         userEmail: user.email,
@@ -132,10 +143,30 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({ isOpen, onClos
     e.preventDefault();
     setIsSaving(true);
     try {
+      // 1. Check if email already registered as a user
+      const uQ = query(collection(db, 'users'), where('email', '==', formData.email.toLowerCase().trim()));
+      const uSnap = await getDocs(uQ);
+
+      if (!uSnap.empty) {
+        toast.error('A user with this email is already registered. Please use "Search Registered" instead.');
+        setIsSaving(false);
+        return;
+      }
+
+      // 2. Check if email already in evaluations
+      const eQ = query(collection(db, 'pof_evaluations'), where('userEmail', '==', formData.email.toLowerCase().trim()));
+      const eSnap = await getDocs(eQ);
+
+      if (!eSnap.empty) {
+        toast.error('An evaluation for this email already exists.');
+        setIsSaving(false);
+        return;
+      }
+
       const studentId = `STU-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
       await addDoc(collection(db, 'pof_evaluations'), {
         userId: studentId, // Using generated ID as fallback userId
-        userEmail: formData.email,
+        userEmail: formData.email.toLowerCase().trim(),
         userName: formData.name,
         status: 'PENDING',
         isApproved: false,

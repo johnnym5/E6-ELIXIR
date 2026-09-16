@@ -87,6 +87,8 @@ export const useStudentDashboardData = (userId: string | undefined): StudentDash
           raw: data,
         });
       }
+    }, (err) => {
+      console.error('[useStudentDashboardData] User profile error:', err);
     });
 
     // 2. Financial accounts
@@ -96,6 +98,8 @@ export const useStudentDashboardData = (userId: string | undefined): StudentDash
     );
     const unsubAccounts = onSnapshot(accountsQ, (snap) => {
       setAccounts(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    }, (err) => {
+      console.error('[useStudentDashboardData] Accounts error:', err);
     });
 
     // 3. PoF Evaluation
@@ -114,7 +118,7 @@ export const useStudentDashboardData = (userId: string | undefined): StudentDash
         setLoading(false);
       },
       (err) => {
-        console.error('useStudentDashboardData eval error:', err);
+        console.error('[useStudentDashboardData] Eval error:', err);
         setLoading(false);
       }
     );
@@ -126,8 +130,10 @@ export const useStudentDashboardData = (userId: string | undefined): StudentDash
       where('status', '==', 'PENDING_ADMIN_VERIFICATION'),
       limit(1)
     );
-    const unsubTopup = onSnapshot(topupQ, snap => {
+    const unsubTopup = onSnapshot(topupQ, (snap) => {
       setPendingTopUpRequest(snap.empty ? null : { id: snap.docs[0].id, ...snap.docs[0].data() });
+    }, (err) => {
+      console.error('[useStudentDashboardData] Topup error:', err);
     });
 
     // 5. Sync-state safety timeout

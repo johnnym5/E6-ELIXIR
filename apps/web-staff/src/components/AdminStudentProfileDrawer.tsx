@@ -2,21 +2,46 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { modalBackdropVariants, drawerVariants } from '../utils/motionPresets';
 import {
-  X as XIcon, User, Globe, CreditCard, Save, Loader2, TrendingUp, Sliders, Activity,
-  Clock, History, ShieldAlert, ChevronRight, Zap, FileText, Trash2, Edit3, ShieldCheck,
-  Layers, Settings, X, CheckCircle2, Target, CheckCheck
+  X as XIcon,
+  User,
+  Globe,
+  CreditCard,
+  Save,
+  Loader2,
+  TrendingUp,
+  Sliders,
+  Activity,
+  Clock,
+  History,
+  ShieldAlert,
+  ChevronRight,
+  Zap,
+  FileText,
+  Trash2,
+  Edit3,
+  ShieldCheck,
+  Layers,
+  Settings,
+  CheckCircle2,
+  Target,
+  CheckCheck,
+  Calendar,
+  ExternalLink,
+  RefreshCw
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import {
-  doc, updateDoc, collection, query, where, orderBy,
-  limit, onSnapshot, serverTimestamp, getDocs, setDoc, addDoc
+  doc, collection, query, where, orderBy,
+  limit, onSnapshot, serverTimestamp, getDocs, setDoc, addDoc, writeBatch
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { toast } from 'sonner';
 import { LIVE_FX_RATE, MAJOR_CURRENCIES } from '../constants';
 import { resolveCountryCurrency, getCurrencyCode } from '../utils/currencyResolver';
 import { convertCurrency } from '../utils/exchangeRateEngine';
+import { executeSoftReset } from '../utils/softResetService';
+import { purgeUserClientSide } from '../utils/governanceService';
 
 interface AdminStudentProfileDrawerProps {
   isOpen: boolean;
@@ -45,8 +70,9 @@ export const AdminStudentProfileDrawer: React.FC<AdminStudentProfileDrawerProps>
   initialTab = 'profile',
 }) => {
   const { theme } = useTheme();
-  const { appUser } = useAuth();
+  const { appUser, role } = useAuth();
   const isDark = theme === 'dark';
+  const isAdmin = role === 'ADMIN_GOVERNANCE' || role === 'ADMIN';
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'profile' | 'activity' | 'documents' | 'governance'>(initialTab);
   const [govSubTab, setGovSubTab] = useState<'config' | 'history'>('config');
@@ -145,6 +171,8 @@ export const AdminStudentProfileDrawer: React.FC<AdminStudentProfileDrawerProps>
           userName: data.displayName || data.name || ''
         }));
       }
+    }, (err) => {
+      console.error("[AdminStudentProfileDrawer] User snapshot error:", err);
     });
 
     // Listen to pof_evaluations
@@ -170,6 +198,8 @@ export const AdminStudentProfileDrawer: React.FC<AdminStudentProfileDrawerProps>
         if (evalData.inputCurrencyUsed) setInputCurrency(evalData.inputCurrencyUsed);
         if (evalData.targetCurrency) setAdminOverriddenTargetCurrency(evalData.targetCurrency);
       }
+    }, (err) => {
+      console.error("[AdminStudentProfileDrawer] Evaluation snapshot error:", err);
     });
 
     return () => { unsubUser(); unsubEval(); };
@@ -180,24 +210,41 @@ export const AdminStudentProfileDrawer: React.FC<AdminStudentProfileDrawerProps>
     if (!isOpen || !student) return;
     const uid = student.userId || student.id;
 
+    let unsubSubmissions = () => {};
+    let unsubRequests = () => {};
+    let unsubLogs = () => {};
+
     if (activeTab === 'documents') {
       const q = query(collection(db, 'users', uid, 'submitted_documents'));
-      return onSnapshot(q, (snap) => setSubmissions(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+      unsubSubmissions = onSnapshot(q, (snap) => setSubmissions(snap.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => {
+        console.error("[AdminStudentProfileDrawer] Documents snapshot error:", err);
+      });
     }
 
     if (activeTab === 'governance') {
       const q = query(collection(db, 'liquidity_requests'), where('userId', '==', uid), orderBy('createdAt', 'desc'));
-      return onSnapshot(q, (snap) => setRequests(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+      unsubRequests = onSnapshot(q, (snap) => setRequests(snap.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => {
+        console.error("[AdminStudentProfileDrawer] Requests snapshot error:", err);
+      });
     }
 
     if (activeTab === 'activity') {
       setLoadingLogs(true);
       const q = query(collection(db, 'audit_logs'), where('studentId', '==', uid), orderBy('createdAt', 'desc'), limit(30));
-      return onSnapshot(q, (snap) => {
+      unsubLogs = onSnapshot(q, (snap) => {
         setAuditLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        setLoadingLogs(false);
+      }, (err) => {
+        console.error("[AdminStudentProfileDrawer] Logs snapshot error:", err);
         setLoadingLogs(false);
       });
     }
+
+    return () => {
+      unsubSubmissions();
+      unsubRequests();
+      unsubLogs();
+    };
   }, [isOpen, student, activeTab]);
 
   const handleSaveGovernance = async () => {
@@ -222,18 +269,18 @@ export const AdminStudentProfileDrawer: React.FC<AdminStudentProfileDrawerProps>
         };
 
         // 1. Update user profile for global sync
-        await updateDoc(doc(db, 'users', uid), {
+        await setDoc(doc(db, 'users', uid), {
             targetAmountNgn: updates.targetAmountNgn,
             targetAmountForeign: updates.targetAmountForeign,
             targetCurrency: updates.targetCurrency,
             inputCurrencyUsed: updates.inputCurrencyUsed,
             targetGBP: updates.targetGBP,
             updatedAt: serverTimestamp()
-        });
+        }, { merge: true });
 
         // 2. Update evaluation record
         if (pofEvaluation) {
-            await updateDoc(doc(db, 'pof_evaluations', pofEvaluation.id), updates);
+            await setDoc(doc(db, 'pof_evaluations', pofEvaluation.id), updates, { merge: true });
         } else {
             await setDoc(doc(db, 'pof_evaluations', uid), {
                 ...updates,
@@ -275,20 +322,20 @@ export const AdminStudentProfileDrawer: React.FC<AdminStudentProfileDrawerProps>
       }
       // Also update name in pof_evaluations if name is changed
       if ((field === 'displayName' || field === 'name') && pofEvaluation) {
-        await updateDoc(doc(db, 'pof_evaluations', pofEvaluation.id), {
+        await setDoc(doc(db, 'pof_evaluations', pofEvaluation.id), {
           userName: value,
           updatedAt: serverTimestamp()
-        });
+        }, { merge: true });
       }
       // If email is changed, maybe update evaluation doc too?
       if (field === 'email' && pofEvaluation) {
-        await updateDoc(doc(db, 'pof_evaluations', pofEvaluation.id), {
+        await setDoc(doc(db, 'pof_evaluations', pofEvaluation.id), {
           userEmail: value,
           updatedAt: serverTimestamp()
-        });
+        }, { merge: true });
       }
 
-      await updateDoc(doc(db, 'users', uid), updates);
+      await setDoc(doc(db, 'users', uid), updates, { merge: true });
       toast.success(`${field.toUpperCase()} updated`);
       setEditingField(null);
     } catch (e: any) {
@@ -303,7 +350,7 @@ export const AdminStudentProfileDrawer: React.FC<AdminStudentProfileDrawerProps>
     const uid = student.userId || student.id;
     setIsSaving(true);
     try {
-      await updateDoc(doc(db, 'users', uid), {
+      await setDoc(doc(db, 'users', uid), {
         topUpPricingConfig: {
           topUpFeePercentage: Number(editForm.topUpFeePercentage),
           flatProcessingFeeNgn: Number(editForm.flatProcessingFeeNgn),
@@ -311,7 +358,7 @@ export const AdminStudentProfileDrawer: React.FC<AdminStudentProfileDrawerProps>
           updatedAt: new Date()
         },
         updatedAt: serverTimestamp()
-      });
+      }, { merge: true });
       toast.success('Pricing updated');
     } catch (e) {
       toast.error('Failed to update pricing');
@@ -363,7 +410,7 @@ export const AdminStudentProfileDrawer: React.FC<AdminStudentProfileDrawerProps>
         updatedAt: serverTimestamp()
       };
       if (pofEvaluation) {
-        await updateDoc(doc(db, 'pof_evaluations', pofEvaluation.id), updates);
+        await setDoc(doc(db, 'pof_evaluations', pofEvaluation.id), updates, { merge: true });
       } else {
         await setDoc(doc(db, 'pof_evaluations', targetUid), {
           ...updates,
@@ -376,6 +423,65 @@ export const AdminStudentProfileDrawer: React.FC<AdminStudentProfileDrawerProps>
       toast.success('Timer updated');
     } catch (e: any) {
       toast.error('Timer update failed: ' + e.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleStopEvaluation = async () => {
+    const uid = student.userId || student.id;
+    if (!uid) return;
+    if (!window.confirm(`Stop tracking evaluation for ${activeStudent.displayName || activeStudent.name}?`)) return;
+
+    setIsSaving(true);
+    try {
+      const evalQ = query(collection(db, 'pof_evaluations'), where('userId', '==', uid));
+      const evalSnap = await getDocs(evalQ);
+      const batch = writeBatch(db);
+      evalSnap.forEach(d => batch.delete(d.ref));
+      await batch.commit();
+      toast.success('Evaluation tracking stopped');
+      onClose();
+    } catch (e: any) {
+      toast.error('Failed to stop evaluation');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSoftReset = async () => {
+    const uid = student.userId || student.id;
+    if (!uid) return;
+    if (!window.confirm(`SOFT RESET: Clear maturity window and balance history for ${activeStudent.displayName || activeStudent.name}? Account login will be preserved.`)) return;
+
+    setIsSaving(true);
+    try {
+      await executeSoftReset(uid);
+      toast.success('Student evaluation reset successfully');
+      onClose();
+    } catch (e: any) {
+      toast.error('Reset failed');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleHardDelete = async () => {
+    const uid = student.userId || student.id;
+    if (!uid) return;
+    if (!window.confirm(`🚨 PERMANENT PURGE: Delete auth record, documents, and all data for ${activeStudent.displayName || activeStudent.name}? This is IRREVERSIBLE.`)) return;
+
+    setIsSaving(true);
+    try {
+      const res = await purgeUserClientSide(uid);
+      if (res.success) {
+        toast.success('Account purged from system');
+        onClose();
+      } else {
+        toast.error(res.message);
+      }
+    } catch (e: any) {
+      toast.error('Purge failed');
     } finally {
       setIsSaving(false);
     }
@@ -833,8 +939,24 @@ export const AdminStudentProfileDrawer: React.FC<AdminStudentProfileDrawerProps>
               )}
             </div>
 
-            <div className="p-8 border-t border-slate-200 dark:border-zinc-800 bg-slate-950/40 shrink-0 flex justify-end">
-              <button onClick={onClose} className="px-8 py-3 rounded-xl bg-white/5 border border-slate-200 dark:border-zinc-800 text-slate-400 font-black text-[10px] uppercase tracking-widest hover:text-white transition-all">Close Viewer</button>
+            <div className="p-8 border-t border-slate-200 dark:border-zinc-800 bg-slate-950/40 shrink-0 space-y-3">
+              {isAdmin && (
+                <div className="grid grid-cols-3 gap-2 mb-4">
+                  <button onClick={handleStopEvaluation} className="flex flex-col items-center justify-center gap-1 p-3 rounded-2xl bg-blue-600/10 border border-blue-500/20 text-blue-400 hover:bg-blue-600/20 transition-all">
+                    <History className="w-4 h-4" />
+                    <span className="text-[7px] font-black uppercase">Stop Eval</span>
+                  </button>
+                  <button onClick={handleSoftReset} className="flex flex-col items-center justify-center gap-1 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-500 hover:bg-amber-500/20 transition-all">
+                    <RefreshCw className="w-4 h-4" />
+                    <span className="text-[7px] font-black uppercase">Soft Reset</span>
+                  </button>
+                  <button onClick={handleHardDelete} className="flex flex-col items-center justify-center gap-1 p-3 rounded-2xl bg-rose-600/10 border border-rose-500/20 text-rose-500 hover:bg-rose-600/20 transition-all">
+                    <Trash2 className="w-4 h-4" />
+                    <span className="text-[7px] font-black uppercase">Purge</span>
+                  </button>
+                </div>
+              )}
+              <button onClick={onClose} className="w-full py-4 rounded-2xl bg-white/5 border border-slate-200 dark:border-zinc-800 text-slate-400 font-black text-[10px] uppercase tracking-widest hover:text-white transition-all">Close Viewer</button>
             </div>
           </motion.div>
         </motion.div>

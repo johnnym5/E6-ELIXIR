@@ -6,12 +6,12 @@ import {
   onSnapshot,
   doc,
   getDoc,
+  setDoc,
   serverTimestamp,
   addDoc,
   limit,
   runTransaction,
-  getDocs,
-  setDoc
+  getDocs
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { toast } from 'sonner';
@@ -275,14 +275,14 @@ export const StaffStudentViewMode: React.FC<StaffStudentViewModeProps> = ({ stud
     try {
       const targetUid = student.userId || student.id;
       // 1. Update student profile in users collection for global sync
-      await updateDoc(doc(db, 'users', targetUid), {
+      await setDoc(doc(db, 'users', targetUid), {
         targetAmountNgn: updates.targetAmountNgn,
         targetAmountForeign: updates.targetAmountForeign,
         targetCurrency: updates.targetCurrency,
         inputCurrencyUsed: updates.inputCurrencyUsed,
         targetGBP: updates.targetGBP,
         updatedAt: serverTimestamp()
-      });
+      }, { merge: true });
 
       // 2. Update evaluation record
       await setDoc(doc(db, 'pof_evaluations', targetUid), {

@@ -28,24 +28,29 @@ const COLLECTIONS_TO_WIPE = [
 
 /**
  * Per-User Soft Reset
- * Clears evaluation and transaction history for a specific student without deleting the user account.
+ * Clears compliance progress (28-day window) without de-authenticating or de-approving the user.
  */
 export const executeSoftReset = async (userId: string) => {
   const batch = writeBatch(db);
 
-  // Clear evaluation
-  batch.delete(doc(db, 'pof_evaluations', userId));
-
-  // Clear top-up request
-  batch.delete(doc(db, 'financial_accounts', `TOPUP_${userId}`));
-
-  // Reset user status
-  batch.update(doc(db, 'users', userId), {
-    status: 'NEW',
-    isApproved: false,
-    onboardingComplete: false,
+  // 1. Reset the evaluation window (but keep the target amounts/settings)
+  const evalRef = doc(db, 'pof_evaluations', userId);
+  batch.update(evalRef, {
+    startDate: '', // Clearing start date resets the 28-day counter
+    consecutiveDays: 0,
+    status: 'PENDING',
     updatedAt: serverTimestamp()
   });
+
+  // 2. Clear manual balance adjustments and ephemeral financial markers
+  // We keep the main 'users' document intact (isApproved, onboardingComplete remain true)
+  batch.update(doc(db, 'users', userId), {
+    status: 'PENDING',
+    updatedAt: serverTimestamp()
+  });
+
+  // 3. Clear any pending top-up indicators in financial_accounts if they are temporary
+  // batch.delete(doc(db, 'financial_accounts', `TOPUP_${userId}`));
 
   await batch.commit();
 };

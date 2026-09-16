@@ -113,8 +113,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // 2. Setup real-time listener for user profile
           const userRef = doc(db, 'users', firebaseUser.uid);
 
-          // 2b. Role Hardening: Ensure role is stored in Firestore (Replacing Custom Claims)
+          // 2b. Role Hardening: Ensure role is stored in Firestore
           try {
+            const profileSnap = await getDoc(userRef);
             const existingData = profileSnap.data();
 
             // Respect existing roles set manually in Firestore (Admin/Counselor/Auditor)
@@ -122,6 +123,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const finalRole = (persistentRole && persistentRole !== 'STUDENT') ? persistentRole : role;
 
             const currentIsApproved = existingData?.isApproved === true;
+            const currentOnboardingComplete = existingData?.onboardingComplete === true;
 
             // SYNC TRIGGER: Update if document doesn't exist, role changed, OR if basic fields are missing (like email)
             const needsSync = !profileSnap.exists() ||
@@ -139,6 +141,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 displayName: whitelistedName || firebaseUser.displayName || derivedUsername,
                 // NEVER set a previously approved user back to false
                 isApproved: currentIsApproved || isApproved,
+                onboardingComplete: currentOnboardingComplete || false,
                 updatedAt: serverTimestamp(),
                 lastLoginAt: serverTimestamp()
               }, { merge: true });

@@ -69,62 +69,50 @@ export const NotificationDropdown: React.FC = () => {
           createdAt: data.createdAt?.seconds || 0
         };
       });
-
-      // 2. Fetch subject audit logs (Actions taken by staff on this student)
-      const qAudit = query(
-        collection(db, 'audit_logs'),
-        where('studentId', '==', currentUser.uid),
-        orderBy('createdAt', 'desc'),
-        limit(15)
-      );
-
-      const unsubAudit = onSnapshot(qAudit, (auditSnap) => {
-        const audits = auditSnap.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            type: data.action || 'AUDIT',
-            message: data.detail || `System Action: ${data.action}`,
-            time: data.createdAt?.seconds
-              ? new Date(data.createdAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-              : 'Just now',
-            isRead: true, // Audit logs are informational/history
-            createdAt: data.createdAt?.seconds || 0
-          };
-        });
-
-        // Merge and sort
-        const merged = [...personal, ...audits].sort((a, b) => b.createdAt - a.createdAt);
-        setNotifications(merged as any);
-      }, (err: any) => {
-        console.warn('Audit stream error:', err);
-
-        // If the error is a missing index, we show a helpful Toast with the link
-        if (err.message?.includes('index')) {
-          const indexUrl = err.message.match(/https:\/\/console\.firebase\.google\.com[^\s]*/)?.[0];
-          if (indexUrl) {
-            toast.error("Database Index Required", {
-              description: "Click to generate the required index for your notifications.",
-              action: {
-                label: "Create Index",
-                onClick: () => window.open(indexUrl, '_blank')
-              },
-              duration: 10000
-            });
-          }
-        }
-
-        // Fallback to just personal notifications to keep the app working
-        const sortedPersonal = personal.sort((a, b) => b.createdAt - a.createdAt);
-        setNotifications(sortedPersonal as any);
-      });
-
-      return unsubAudit;
+      setNotifications(personal as any);
     }, (err) => {
       console.warn('Notification stream error:', err);
     });
 
-    return unsubNotif;
+    // 2. Fetch subject audit logs (Actions taken by staff on this student)
+    const qAudit = query(
+      collection(db, 'audit_logs'),
+      where('studentId', '==', currentUser.uid),
+      orderBy('createdAt', 'desc'),
+      limit(15)
+    );
+
+    const unsubAudit = onSnapshot(qAudit, (auditSnap) => {
+      const audits = auditSnap.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          type: data.action || 'AUDIT',
+          message: data.detail || `System Action: ${data.action}`,
+          time: data.createdAt?.seconds
+            ? new Date(data.createdAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            : 'Just now',
+          isRead: true, // Audit logs are informational/history
+          createdAt: data.createdAt?.seconds || 0
+        };
+      });
+
+      // Merge with personal notifications and sort
+      setNotifications(prev => {
+        // Keep only personal notifications that aren't also audits (based on ID if applicable)
+        const personal = prev.filter(n => !n.type.includes('AUDIT') && !n.id.startsWith('audit_'));
+        const merged = [...personal, ...audits].sort((a, b) => (b as any).createdAt - (a as any).createdAt);
+        return merged as any;
+      });
+    }, (err: any) => {
+      console.warn('Audit stream error:', err);
+      // Handle missing index or permissions
+    });
+
+    return () => {
+      unsubNotif();
+      unsubAudit();
+    };
   }, [currentUser]);
 
   const pageSize = 5;
